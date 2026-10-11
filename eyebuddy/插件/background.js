@@ -237,21 +237,20 @@ async function summarizeDanmaku(items, apiKey) {
 ${lines}
 ---`;
 
-  const response = await fetch(QWEN_API_URL, {
+  const response = await fetch(AGNES_API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: QWEN_MODEL,
+      model: AGNES_MODEL,
       messages: [{ role: "user", content: prompt }],
     }),
   });
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`API ${response.status}: ${errText}`);
+    throw new Error(await buildApiError(response));
   }
 
   const data = await response.json();
