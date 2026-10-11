@@ -256,6 +256,59 @@ function bindSettings() {
   });
 }
 
+function bindVoice() {
+  $("open-voice").addEventListener("click", () => {
+    $("control-panel").classList.add("hidden");
+    $("voice-panel").classList.remove("hidden");
+  });
+
+  $("voice-back").addEventListener("click", async () => {
+    $("voice-panel").classList.add("hidden");
+    const state = await getState();
+    updateUI(state);
+  });
+
+  // 演示逻辑：不管说什么，都“执行”同一条指令——打开 bilibili
+  const runVoiceCommand = (text) => {
+    const t = (text || "").trim();
+    if (!t) return;
+    $("voice-user").textContent = "你：" + t;
+    $("voice-user").classList.remove("hidden");
+    $("voice-ai").textContent = "好的，正在为你打开 bilibili…";
+    $("voice-ai").classList.remove("hidden");
+    $("voice-status").textContent = "指令已识别，正在执行";
+    setTimeout(
+      () => chrome.tabs.create({ url: "https://www.bilibili.com" }),
+      800,
+    );
+  };
+
+  $("voice-send").addEventListener("click", () =>
+    runVoiceCommand($("voice-input").value),
+  );
+  $("voice-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runVoiceCommand($("voice-input").value);
+  });
+
+  // 麦克风：模拟语音识别——聆听 1.5 秒后自动“听”到指令，再执行
+  $("voice-mic").addEventListener("click", () => {
+    const mic = $("voice-mic");
+    if (mic.classList.contains("listening")) return;
+    mic.classList.add("listening");
+    $("voice-status").textContent = "正在聆听…（演示识别）";
+    $("voice-status").classList.add("listening");
+    $("voice-input").value = "";
+
+    setTimeout(() => {
+      mic.classList.remove("listening");
+      $("voice-status").classList.remove("listening");
+      $("voice-status").textContent = "识别完成：帮我打开bilibili";
+      $("voice-input").value = "帮我打开bilibili";
+      setTimeout(() => runVoiceCommand($("voice-input").value), 2500);
+    }, 1500);
+  });
+}
+
 async function init() {
   const state = await getState();
   $("api-key-input").value = state.apiKey || "";
@@ -266,6 +319,7 @@ async function init() {
   bindOnboarding();
   bindToggles();
   bindSettings();
+  bindVoice();
 }
 
 init();
