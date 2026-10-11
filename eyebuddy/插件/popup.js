@@ -5,6 +5,9 @@ const DEFAULT_STATE = {
     imageDescribe: false,
     textReader: false,
     crosshair: false,
+    readingGuide: false,
+    typography: false,
+    bigCursor: false,
     colorBlindMode: "off",
   },
   apiKey: "",
@@ -90,6 +93,20 @@ function updateUI(state) {
   $("crosshair-status").textContent = features.crosshair ? "已开启" : "未开启";
   $("crosshair-status").classList.toggle("active", features.crosshair);
 
+  $("toggle-reading-guide").checked = features.readingGuide;
+  $("reading-guide-status").textContent = features.readingGuide
+    ? "已开启"
+    : "未开启";
+  $("reading-guide-status").classList.toggle("active", features.readingGuide);
+
+  $("toggle-typo").checked = features.typography;
+  $("typo-status").textContent = features.typography ? "已开启" : "未开启";
+  $("typo-status").classList.toggle("active", features.typography);
+
+  $("toggle-bigcursor").checked = features.bigCursor;
+  $("bigcursor-status").textContent = features.bigCursor ? "已开启" : "未开启";
+  $("bigcursor-status").classList.toggle("active", features.bigCursor);
+
   const cbEnabled = features.colorBlindMode !== "off";
   $("toggle-cb").checked = cbEnabled;
   $("cb-status").textContent = cbEnabled
@@ -114,6 +131,9 @@ async function completeOnboarding(features) {
     state.features.imageDescribe = true;
     state.features.textReader = true;
     state.features.crosshair = true;
+    state.features.readingGuide = true;
+    state.features.typography = true;
+    state.features.bigCursor = true;
     state.features.colorBlindMode = "protanopia";
   } else if (features === "aiDescription") {
     state.features.aiDescription = true;
@@ -167,6 +187,18 @@ function bindToggles() {
 
   $("toggle-crosshair").addEventListener("change", (e) => {
     toggleFeature("crosshair", e.target.checked);
+  });
+
+  $("toggle-reading-guide").addEventListener("change", (e) => {
+    toggleFeature("readingGuide", e.target.checked);
+  });
+
+  $("toggle-typo").addEventListener("change", (e) => {
+    toggleFeature("typography", e.target.checked);
+  });
+
+  $("toggle-bigcursor").addEventListener("change", (e) => {
+    toggleFeature("bigCursor", e.target.checked);
   });
 
   $("toggle-cb").addEventListener("change", (e) => {
