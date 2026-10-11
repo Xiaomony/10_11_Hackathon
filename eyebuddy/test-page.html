@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>瞳伴 EyeBuddy · 图片悬停描述测试页</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "Microsoft YaHei", sans-serif;
+      background: #0a0e14;
+      color: #e8eef5;
+      padding: 40px 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .tip {
+      background: rgba(0, 229, 255, 0.08);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 14px;
+      line-height: 1.8;
+      margin: 16px 0 32px;
+    }
+    .tip strong { color: #00e5ff; }
+    .case {
+      background: #111720;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .case img { border-radius: 8px; display: block; }
+    .case .desc h2 { font-size: 17px; margin-bottom: 8px; }
+    .case .desc p { font-size: 14px; color: #8b9bb4; line-height: 1.7; }
+    .case .expect {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #7df9ff;
+      background: rgba(0, 229, 255, 0.06);
+      border-left: 3px solid #00e5ff;
+      padding: 8px 12px;
+      border-radius: 0 6px 6px 0;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      padding: 2px 10px;
+      border-radius: 10px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .badge.free { background: rgba(80, 220, 120, 0.15); color: #7fe8a4; }
+    .badge.needkey { background: rgba(255, 180, 60, 0.15); color: #ffc978; }
+  </style>
+</head>
+<body>
+  <h1>🖼️ 图片悬停描述 · 测试页</h1>
+  <div class="tip">
+    <strong>使用方法：</strong>加载插件后，开启 popup 里的「图片悬停描述」开关，然后把鼠标悬停在下面每张图上停 1 秒左右。<br>
+    <strong>标注说明：</strong><span class="badge free">无需 API Key</span> = 现在就能完整验证；<span class="badge needkey">需要 Key</span> = 要等视觉模型 Key 才能出 AI 文本（但无 Key 时的报错提示也值得验证）。
+  </div>
+
+  <div class="case">
+    <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=a%20cute%20orange%20cat%20sitting%20on%20a%20windowsill%2C%20soft%20morning%20light%2C%20photorealistic&image_size=square" width="220" alt="一只橘猫坐在窗台上晒太阳">
+    <div class="desc">
+      <h2>用例 1：有 alt 的图片<span class="badge free">无需 API Key</span></h2>
+      <p>alt="一只橘猫坐在窗台上晒太阳"</p>
+      <div class="expect">预期：悬停后直接弹出「🖼️ 图片：一只橘猫坐在窗台上晒太阳」；若同时开了文字朗读，会自动读出来。全程不消耗 API。</div>
+    </div>
+  </div>
+
+  <div class="case">
+    <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mountain%20lake%20at%20sunrise%2C%20mist%20over%20calm%20water%2C%20photorealistic%20landscape&image_size=landscape_4_3" width="220" aria-label="日出时的山间湖泊，湖面有薄雾" alt="">
+    <div class="desc">
+      <h2>用例 2：无 alt 但有 aria-label 的图片<span class="badge free">无需 API Key</span></h2>
+      <p>aria-label="日出时的山间湖泊，湖面有薄雾"</p>
+      <div class="expect">预期：和用例 1 相同，直接读出 aria-label 内容，不耗 API。</div>
+    </div>
+  </div>
+
+  <div class="case">
+    <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=busy%20city%20street%20at%20night%20with%20neon%20lights%2C%20people%20crossing%2C%20cinematic&image_size=landscape_4_3" width="220">
+    <div class="desc">
+      <h2>用例 3：无任何替代文本的图片<span class="badge needkey">需要 Key</span></h2>
+      <p>这正是视障用户最常遇到的"黑洞图"——读屏器只会说"图片"两个字</p>
+      <div class="expect">预期：① 未配 Key 时弹出「⚠️ 请先在插件设置中配置 API Key」（说明错误链路正常）；② 配好 Key 后弹出 AI 对这张图的中文描述并自动朗读。</div>
+    </div>
+  </div>
+
+  <div class="case">
+    <div style="width:30px;height:30px;background:#2a3550;border-radius:6px;flex-shrink:0"></div>
+    <div class="desc">
+      <h2>用例 4：页面上的装饰小元素<span class="badge free">无需 API Key</span></h2>
+      <p>一个 30×30 的灰色小方块（页面上大量装饰图标属于这类）</p>
+      <div class="expect">预期：悬停无任何反应（插件自动过滤小于 40px 的元素，避免骚扰）。</div>
+    </div>
+  </div>
+</body>
+</html>
