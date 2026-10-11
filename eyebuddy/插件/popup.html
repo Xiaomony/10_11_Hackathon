@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>瞳伴 EyeBuddy</title>
+  </head>
+  <body>
+    <section id="onboarding" class="view" aria-label="首次使用引导">
+      <h1 class="logo">
+        <svg
+          viewBox="0 0 512 512"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="popBg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#0d1320" />
+              <stop offset="100%" stop-color="#070a10" />
+            </linearGradient>
+            <radialGradient id="popIris" cx="50%" cy="45%">
+              <stop offset="0%" stop-color="#7df9ff" />
+              <stop offset="50%" stop-color="#00e5ff" />
+              <stop offset="100%" stop-color="#006978" />
+            </radialGradient>
+          </defs>
+          <rect width="512" height="512" rx="112" fill="url(#popBg)" />
+          <path
+            d="M 96 256 Q 256 128 416 256 Q 256 384 96 256 Z"
+            fill="none"
+            stroke="#00e5ff"
+            stroke-width="3.5"
+            opacity="0.9"
+          />
+          <circle cx="256" cy="256" r="76" fill="url(#popIris)" />
+          <circle cx="256" cy="256" r="34" fill="#050810" />
+          <ellipse
+            cx="238"
+            cy="238"
+            rx="14"
+            ry="10"
+            fill="rgba(255,255,255,0.7)"
+            transform="rotate(-30 238 238)"
+          />
+          <circle cx="340" cy="214" r="12" fill="#ffd54f" />
+        </svg>
+        <span>瞳伴 EyeBuddy</span>
+      </h1>
+      <p class="subtitle">请选择你需要帮助的场景：</p>
+
+      <button
+        class="scene-card"
+        data-feature="aiDescription"
+        aria-label="我看不见，需要 AI 描述图片和朗读文字"
+      >
+        <span class="scene-icon" aria-hidden="true">🙈</span>
+        <span class="scene-title">我看不见</span>
+        <span class="scene-desc">需要 AI 描述图片 + 朗读文字</span>
+      </button>
+
+      <button
+        class="scene-card"
+        data-feature="imageDescribe"
+        aria-label="我看不懂图片，需要悬停时 AI 描述图片内容"
+      >
+        <span class="scene-icon" aria-hidden="true">🖼️</span>
+        <span class="scene-title">我看不懂图片</span>
+        <span class="scene-desc">悬停图片，AI 讲出图里是什么</span>
+      </button>
+
+      <button
+        class="scene-card"
+        data-feature="textReader"
+        aria-label="我想听文字朗读，需要朗读段落并高亮标记"
+      >
+        <span class="scene-icon" aria-hidden="true">📖</span>
+        <span class="scene-title">我想听文字</span>
+        <span class="scene-desc">朗读段落并高亮标记</span>
+      </button>
+
+      <button
+        class="scene-card"
+        data-feature="crosshair"
+        aria-label="我看得见但看不清，需要增强鼠标定位"
+      >
+        <span class="scene-icon" aria-hidden="true">👀</span>
+        <span class="scene-title">我看得见但看不清</span>
+        <span class="scene-desc">需要增强鼠标定位</span>
+      </button>
+
+      <button
+        class="scene-card"
+        data-feature="colorBlindness"
+        aria-label="我分不清颜色，需要校正页面颜色"
+      >
+        <span class="scene-icon" aria-hidden="true">🎨</span>
+        <span class="scene-title">我分不清颜色</span>
+        <span class="scene-desc">需要校正页面颜色</span>
+      </button>
+
+      <div class="onboarding-actions">
+        <button id="enable-all" class="btn-primary">全部开启</button>
+        <button id="skip-onboarding" class="btn-secondary">跳过引导</button>
+      </div>
+    </section>
+
+    <section id="control-panel" class="view hidden" aria-label="控制面板">
+      <header class="panel-header">
+        <h1 class="logo">
+          <svg
+            viewBox="0 0 512 512"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient id="popBg2" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#0d1320" />
+                <stop offset="100%" stop-color="#070a10" />
+              </linearGradient>
+              <radialGradient id="popIris2" cx="50%" cy="45%">
+                <stop offset="0%" stop-color="#7df9ff" />
+                <stop offset="50%" stop-color="#00e5ff" />
+                <stop offset="100%" stop-color="#006978" />
+              </radialGradient>
+            </defs>
+            <rect width="512" height="512" rx="112" fill="url(#popBg2)" />
+            <path
+              d="M 96 256 Q 256 128 416 256 Q 256 384 96 256 Z"
+              fill="none"
+              stroke="#00e5ff"
+              stroke-width="3.5"
+              opacity="0.9"
+            />
+            <circle cx="256" cy="256" r="76" fill="url(#popIris2)" />
+            <circle cx="256" cy="256" r="34" fill="#050810" />
+            <ellipse
+              cx="238"
+              cy="238"
+              rx="14"
+              ry="10"
+              fill="rgba(255,255,255,0.7)"
+              transform="rotate(-30 238 238)"
+            />
+            <circle cx="340" cy="214" r="12" fill="#ffd54f" />
+          </svg>
+          <span>瞳伴 EyeBuddy</span>
+        </h1>
+      </header>
+
+      <div class="feature-group">
+        <div class="feature-row">
+          <div class="feature-info">
+            <span class="feature-name">AI 页面描述</span>
+            <span class="feature-status" id="ai-status">未开启</span>
+          </div>
+          <label class="toggle">
+            <input
+              type="checkbox"
+              id="toggle-ai"
+              aria-label="AI 图片描述开关"
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <button id="scan-now" class="btn-action hidden">AI 描述当前页面</button>
+      </div>
+
+      <div class="feature-group">
+        <div class="feature-row">
+          <div class="feature-info">
+            <span class="feature-name">图片悬停描述</span>
+            <span class="feature-status" id="imgdesc-status">未开启</span>
+          </div>
+          <label class="toggle">
+            <input
+              type="checkbox"
+              id="toggle-imgdesc"
+              aria-label="图片悬停描述开关"
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <span class="shortcut-hint"
+          >悬停图片自动描述 · 无 alt 的图也能听懂</span
+        >
+      </div>
+
+      <div class="feature-group">
+        <div class="feature-row">
+          <div class="feature-info">
+            <span class="feature-name">文字朗读</span>
+            <span class="feature-status" id="tts-status">未开启</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-tts" aria-label="文字朗读开关" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <span class="shortcut-hint">悬停段落自动朗读 · 选中文字朗读</span>
+      </div>
+
+      <div class="feature-group">
+        <div class="feature-row">
+          <div class="feature-info">
+            <span class="feature-name">鼠标增强</span>
+            <span class="feature-status" id="crosshair-status">未开启</span>
+          </div>
+          <label class="toggle">
+            <input
+              type="checkbox"
+              id="toggle-crosshair"
+              aria-label="鼠标增强开关"
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <span class="shortcut-hint">快捷键：Ctrl+Shift+X</span>
+      </div>
+
+      <div class="feature-group">
+        <div class="feature-row">
+          <div class="feature-info">
+            <span class="feature-name">色盲校正</span>
+            <span class="feature-status" id="cb-status">未开启</span>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-cb" aria-label="色盲校正开关" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="cb-modes hidden" id="cb-modes">
+          <label class="radio-label"
+            ><input type="radio" name="cb-mode" value="protanopia" />
+            红绿色盲</label
+          >
+          <label class="radio-label"
+            ><input type="radio" name="cb-mode" value="deuteranomaly" />
+            绿色弱</label
+          >
+          <label class="radio-label"
+            ><input type="radio" name="cb-mode" value="tritanopia" />
+            蓝黄色盲</label
+          >
+        </div>
+      </div>
+
+      <details class="settings-section">
+        <summary>⚙️ 设置</summary>
+        <div class="settings-content">
+          <label for="api-key-input" class="settings-label"
+            >通义千问 API Key</label
+          >
+          <input
+            type="password"
+            id="api-key-input"
+            placeholder="sk-..."
+            class="text-input"
+          />
+          <p class="settings-hint">
+            免费申请：<a
+              href="https://dashscope.console.aliyun.com/apiKey"
+              target="_blank"
+              >阿里云百炼平台</a
+            >
+          </p>
+          <label
+            for="reading-rate-input"
+            class="settings-label"
+            style="margin-top: 14px"
+            >朗读语速：<span id="reading-rate-value">0.9</span>x</label
+          >
+          <input
+            type="range"
+            id="reading-rate-input"
+            min="0.5"
+            max="2.0"
+            step="0.1"
+            value="0.9"
+            class="range-input"
+            aria-label="朗读语速调节"
+          />
+          <p class="settings-hint">0.5x 慢速 · 0.9x 默认 · 1.5x 快速</p>
+        </div>
+      </details>
+
+      <footer class="panel-footer">
+        <button id="show-onboarding" class="btn-text">重新引导</button>
+        <button id="help-btn" class="btn-text">帮助</button>
+        <div class="author-info">
+          <span class="author-name">作者 Weihao Wu</span>
+          <a
+            href="https://forum.trae.cn/u/%E7%94%A8%E6%88%B732724/summary"
+            target="_blank"
+            rel="noopener"
+            class="author-link"
+            >TRAE @用户32724</a
+          >
+          <a
+            href="https://github.com/Wayhhow"
+            target="_blank"
+            rel="noopener"
+            class="author-link"
+            >GitHub @Wayhhow</a
+          >
+        </div>
+      </footer>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

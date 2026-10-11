@@ -1,0 +1,15 @@
+# 敏感信息
+Session_ID.txt
+*Session_ID*
+.env
+*.key
+
+# 演示素材（非技术源码）
+演示视频_压缩.mp4
+*.mp4
+截图/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini

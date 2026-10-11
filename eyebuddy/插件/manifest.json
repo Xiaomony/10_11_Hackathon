@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "瞳伴 EyeBuddy",
+  "version": "1.1.0",
+  "description": "看不见图、找不到鼠标、分不清颜色、看不清文字？一个插件，五种功能，一站解决。",
+  "permissions": ["storage", "activeTab", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "瞳伴 EyeBuddy",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_script.js"]
+    }
+  ],
+  "commands": {
+    "toggle-crosshair": {
+      "suggested_key": { "default": "Ctrl+Shift+X" },
+      "description": "切换鼠标十字准星"
+    },
+    "describe-page": {
+      "suggested_key": { "default": "Ctrl+Shift+A" },
+      "description": "AI 描述当前页面"
+    },
+    "toggle-reader": {
+      "suggested_key": { "default": "Ctrl+Shift+R" },
+      "description": "开关文字朗读"
+    },
+    "cycle-colorblind": {
+      "suggested_key": { "default": "Ctrl+Shift+C" },
+      "description": "循环切换色盲校正模式"
+    }
+  }
+}

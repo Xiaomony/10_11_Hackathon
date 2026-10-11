@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瞳伴 EyeBuddy — 一个插件，四种功能，一站解决</title>
+    <style>
+        /* ===== Reset & Base ===== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0e14;
+            --bg-card: #111720;
+            --bg-elevated: #1a2030;
+            --primary: #00e5ff;
+            --primary-dim: #00b8d4;
+            --primary-deep: #006978;
+            --accent: #ffd54f;
+            --accent-glow: rgba(255, 213, 79, 0.15);
+            --text: #e8eef5;
+            --text-muted: #8b9bb4;
+            --text-dim: #5a6a82;
+            --border: rgba(255, 255, 255, 0.06);
+            --border-hover: rgba(0, 229, 255, 0.3);
+            --radius: 20px;
+            --radius-sm: 12px;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --shadow-glow: 0 0 40px rgba(0, 229, 255, 0.08);
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.75;
+            overflow-x: hidden;
+        }
+
+        /* ===== Grain Overlay ===== */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            opacity: 0.025;
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        /* ===== Custom Cursor ===== */
+        .cursor-dot, .cursor-ring {
+            position: fixed;
+            top: 0; left: 0;
+            pointer-events: none;
+            z-index: 9999;
+            border-radius: 50%;
+            will-change: transform;
+        }
+        .cursor-dot {
+            width: 6px; height: 6px;
+            background: var(--primary);
+            transform: translate(-50%, -50%);
+        }
+        .cursor-ring {
+            width: 32px; height: 32px;
+            border: 1.5px solid var(--primary);
+            transform: translate(-50%, -50%);
+            transition: width 0.3s var(--ease-out), height 0.3s var(--ease-out), border-color 0.3s;
+        }
+        .cursor-ring.hover {
+            width: 56px; height: 56px;
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        /* ===== Scroll Reveal ===== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .reveal-delay-1 { transition-delay: 0.1s; }
+        .reveal-delay-2 { transition-delay: 0.2s; }
+        .reveal-delay-3 { transition-delay: 0.3s; }
+
+        /* ===== Container ===== */
+        .container {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* ===== Nav ===== */
+        nav {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            z-index: 100;
+            background: rgba(10, 14, 20, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 50px;
+            padding: 12px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav .brand {
+            font-weight: 700;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text);
+        }
+        nav .brand svg { width: 32px; height: 32px; flex-shrink: 0; }
+        nav .brand .brand-logo { display: inline-flex; align-items: center; justify-content: center; }
+        nav .nav-links { display: flex; gap: 28px; }
+        nav .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        nav .nav-links a:hover { color: var(--primary); }
+
+        /* ===== Hero ===== */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 120px 24px 80px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(0, 229, 255, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        /* ===== Hero Banner (头图) ===== */
+        .hero-banner {
+            width: 100%;
+            max-width: 1100px;
+            margin: 96px auto 40px;
+            padding: 0 24px;
+            position: relative;
+            z-index: 2;
+        }
+        .hero-banner-inner {
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 80px rgba(0, 229, 255, 0.08);
+            background: #05070b;
+            aspect-ratio: 16 / 9;
+        }
+        .hero-banner-inner svg,
+        .hero-banner-inner object {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        @media (max-width: 768px) {
+            .hero-banner { margin-bottom: 24px; }
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 229, 255, 0.08);
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--primary);
+            margin-bottom: 32px;
+        }
+
+        .hero h1 {
+            font-size: clamp(36px, 7vw, 72px);
+            font-weight: 900;
+            letter-spacing: -1px;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff 0%, var(--primary) 50%, var(--primary-dim) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero .tagline {
+            font-size: clamp(16px, 2.5vw, 22px);
+            color: var(--text-muted);
+            max-width: 600px;
+            margin-bottom: 48px;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 64px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .hero-stat { text-align: center; }
+        .hero-stat .num {
+            font-size: clamp(28px, 4vw, 40px);
+            font-weight: 900;
+            color: var(--accent);
+            line-height: 1;
+        }
+        .hero-stat .label {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-top: 8px;
+            letter-spacing: 1px;
+        }
+
+        .scroll-hint {
+            position: absolute;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--text-dim);
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            animation: bob 2s ease-in-out infinite;
+        }
+        @keyframes bob {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(8px); }
+        }
+
+        /* ===== Section ===== */
+        section { padding: 100px 0; }
+
+        .section-label {
+            display: inline-block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: clamp(28px, 4vw, 40px);
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 16px;
+        }
+
+        .section-desc {
+            color: var(--text-muted);
+            font-size: 17px;
+            max-width: 580px;
+            margin-bottom: 56px;
+        }
+
+        /* ===== Problem Grid ===== */
+        .problem-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .problem-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 36px 28px;
+            transition: border-color 0.3s, transform 0.3s var(--ease-out), box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .problem-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .problem-card:hover {
+            transform: translateY(-6px);
+            border-color: var(--border-hover);
+            box-shadow: var(--shadow-glow);
+        }
+        .problem-card:hover::before { opacity: 1; }
+
+        .problem-card svg {
+            width: 40px; height: 40px;
+            margin-bottom: 20px;
+            stroke: var(--primary);
+            fill: none;
+            stroke-width: 1.5;
+        }
+
+        .problem-card h3 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .problem-card .people {
+            font-size: 13px;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+
+        .problem-card p {
+            color: var(--text-muted);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        /* ===== Feature Cards ===== */
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0;
+            margin-bottom: 32px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+        .feature-card:hover { border-color: var(--border-hover); }
+
+        .feature-card.reverse .feature-visual { order: -1; }
+
+        .feature-info {
+            padding: 48px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .feature-info .feature-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 229, 255, 0.08);
+            color: var(--primary);
+            padding: 5px 14px;
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            width: fit-content;
+        }
+
+        .feature-info h3 {
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .feature-info h3 svg { width: 28px; height: 28px; stroke: var(--primary); fill: none; stroke-width: 1.5; }
+
+        .feature-info p {
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            font-size: 15px;
+        }
+
+        .feature-info ul {
+            list-style: none;
+        }
+        .feature-info ul li {
+            padding: 5px 0;
+            color: var(--text-muted);
+            font-size: 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .feature-info ul li::before {
+            content: '';
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: var(--primary);
+            margin-top: 10px;
+            flex-shrink: 0;
+        }
+
+        .feature-visual {
+            background: var(--bg-elevated);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            min-height: 280px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* AI Demo Box */
+        .ai-demo {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            width: 100%;
+            max-width: 340px;
+        }
+        .ai-demo .ai-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+        .ai-demo .ai-label svg { width: 16px; height: 16px; }
+        .ai-demo .ai-text {
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+        .ai-demo .ai-typing {
+            display: inline-block;
+            width: 2px; height: 14px;
+            background: var(--primary);
+            margin-left: 2px;
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Crosshair Demo */
+        .crosshair-demo {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            height: 200px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+        }
+        .crosshair-demo .ch-v {
+            position: absolute;
+            top: 0; left: 50%;
+            width: 2px; height: 100%;
+            background: #00ffff;
+            box-shadow: 0 0 6px #00ffff, 0 0 12px rgba(0,255,255,0.4);
+        }
+        .crosshair-demo .ch-h {
+            position: absolute;
+            top: 50%; left: 0;
+            width: 100%; height: 2px;
+            background: #00ffff;
+            box-shadow: 0 0 6px #00ffff, 0 0 12px rgba(0,255,255,0.4);
+        }
+        .crosshair-demo .ch-dot {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 14px; height: 14px;
+            border: 2px solid #00ffff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00ffff;
+        }
+
+        /* Color Blind Demo */
+        .cb-demo {
+            display: flex;
+            gap: 10px;
+        }
+        .cb-demo .cb-block {
+            width: 56px; height: 90px;
+            border-radius: 8px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.9);
+        }
+        .cb-demo .cb-red { background: #ef4444; }
+        .cb-demo .cb-green { background: #22c55e; }
+        .cb-demo .cb-blue { background: #3b82f6; }
+        .cb-demo .cb-yellow { background: #eab308; color: rgba(0,0,0,0.7); }
+
+        /* Text Reader Demo */
+        .reader-demo {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 24px;
+            width: 100%;
+            max-width: 340px;
+        }
+        .reader-demo .rd-paragraph {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.8;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .reader-demo .rd-paragraph.highlighted {
+            background: rgba(255, 213, 79, 0.15);
+            color: var(--text);
+            outline: 2px solid var(--accent);
+        }
+        .reader-demo .rd-paragraph:last-child { margin-bottom: 0; }
+        .reader-demo .rd-icon {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--primary);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        .reader-demo .rd-icon svg { width: 16px; height: 16px; }
+
+        /* ===== Quote ===== */
+        .quote-section {
+            text-align: center;
+            padding: 120px 24px;
+            position: relative;
+        }
+        .quote-section::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px; height: 600px;
+            background: radial-gradient(circle, rgba(0, 229, 255, 0.04) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .quote-section blockquote {
+            max-width: 720px;
+            margin: 0 auto;
+            font-size: clamp(20px, 3vw, 28px);
+            line-height: 1.7;
+            font-style: italic;
+            color: var(--text);
+            position: relative;
+        }
+        .quote-section .source {
+            margin-top: 32px;
+            font-size: 15px;
+            color: var(--text-dim);
+        }
+
+        /* ===== Tech Grid ===== */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        .tech-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 28px 20px;
+            text-align: center;
+            transition: border-color 0.3s, transform 0.3s var(--ease-out);
+        }
+        .tech-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--border-hover);
+        }
+        .tech-card svg {
+            width: 32px; height: 32px;
+            stroke: var(--primary);
+            fill: none;
+            stroke-width: 1.5;
+            margin-bottom: 14px;
+        }
+        .tech-card h4 {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .tech-card p {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        /* ===== Value ===== */
+        .value-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+        }
+        .value-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--primary);
+            border-radius: var(--radius);
+            padding: 40px 36px;
+        }
+        .value-card h3 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        .value-card p {
+            color: var(--text-muted);
+            font-size: 15px;
+            line-height: 1.8;
+        }
+
+        /* ===== Footer ===== */
+        footer {
+            text-align: center;
+            padding: 80px 24px;
+            border-top: 1px solid var(--border);
+        }
+        footer h2 {
+            font-size: 32px;
+            font-weight: 900;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        footer p { color: var(--text-dim); font-size: 15px; }
+        footer .badges {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+        footer .badge {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            padding: 8px 18px;
+            border-radius: 50px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        footer .author {
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+            max-width: 560px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        footer .author-line {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.7;
+        }
+        footer .author-line strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+        footer .author-links {
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        footer .author-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background: rgba(0, 229, 255, 0.05);
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            border-radius: 50px;
+            color: var(--text);
+            font-size: 13px;
+            text-decoration: none;
+            transition: all 0.3s var(--ease-out);
+        }
+        footer .author-link:hover {
+            background: rgba(0, 229, 255, 0.12);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+        footer .author-link svg {
+            width: 16px;
+            height: 16px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+        footer .author-quote {
+            color: var(--text-dim);
+            font-size: 14px;
+            font-style: italic;
+            line-height: 1.7;
+            margin-top: 16px;
+        }
+        footer .copyright {
+            margin-top: 32px;
+            font-size: 12px;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== Why Section (作者故事) ===== */
+        .why-section {
+            padding: 96px 0;
+            background: linear-gradient(180deg, var(--bg) 0%, #0c1219 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .why-section::before {
+            content: '';
+            position: absolute;
+            top: -200px; right: -200px;
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .why-intro {
+            text-align: center;
+            max-width: 720px;
+            margin: 0 auto 56px;
+            color: var(--text-muted);
+            font-size: 17px;
+            line-height: 1.85;
+        }
+        .why-intro strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+        .why-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .why-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            transition: all 0.3s var(--ease-out);
+            position: relative;
+        }
+        .why-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 229, 255, 0.08);
+        }
+        .why-card .why-quote {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.75;
+            margin-bottom: 18px;
+            font-style: italic;
+            min-height: 80px;
+        }
+        .why-card .why-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--primary);
+            font-weight: 600;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+            width: 100%;
+        }
+        .why-card .why-link::after {
+            content: '→';
+            margin-left: auto;
+            transition: transform 0.3s;
+        }
+        .why-card:hover .why-link::after {
+            transform: translateX(4px);
+        }
+
+        /* ===== Try Section (立即体验) ===== */
+        .try-section {
+            padding: 96px 0;
+            background: var(--bg);
+        }
+        .try-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 48px;
+        }
+        .try-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 32px 24px;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.3s;
+        }
+        .try-card:hover { border-color: var(--border-hover); }
+        .try-card h3 {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .try-card h3 svg { width: 22px; height: 22px; stroke: var(--primary); fill: none; stroke-width: 1.8; }
+        .try-card .try-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.7;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+        .try-card .try-btn {
+            background: rgba(0, 229, 255, 0.08);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            color: var(--primary);
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        .try-card .try-btn:hover {
+            background: rgba(0, 229, 255, 0.15);
+            border-color: var(--primary);
+        }
+        .try-card .try-btn.active {
+            background: var(--primary);
+            color: var(--bg);
+        }
+        .try-card .try-output {
+            margin-top: 14px;
+            padding: 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text);
+            line-height: 1.7;
+            min-height: 80px;
+            display: none;
+        }
+        .try-card .try-output.visible { display: block; }
+        .try-card .try-sample-img {
+            width: 100%;
+            height: 100px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+            font-weight: 600;
+            transition: filter 0.3s;
+        }
+        .try-card .try-sample-text {
+            padding: 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.7;
+            margin-bottom: 16px;
+        }
+        .try-card .try-filters {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+        .try-card .try-filter-btn {
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .try-card .try-filter-btn:hover, .try-card .try-filter-btn.active {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* ===== Compare Section (竞品对比) ===== */
+        .compare-section {
+            padding: 96px 0;
+            background: linear-gradient(180deg, var(--bg) 0%, #0c1219 100%);
+        }
+        .compare-table-wrap {
+            margin-top: 48px;
+            overflow-x: auto;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 720px;
+        }
+        .compare-table th, .compare-table td {
+            padding: 18px 16px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .compare-table th {
+            background: var(--bg-elevated);
+            color: var(--text);
+            font-weight: 700;
+            font-size: 14px;
+            position: sticky;
+            top: 0;
+        }
+        .compare-table th:first-child, .compare-table td:first-child {
+            text-align: left;
+            color: var(--text-muted);
+            font-weight: 600;
+            padding-left: 24px;
+        }
+        .compare-table .col-eyebuddy {
+            background: rgba(0, 229, 255, 0.04);
+            color: var(--primary);
+            font-weight: 700;
+        }
+        .compare-table .col-eyebuddy.header {
+            background: rgba(0, 229, 255, 0.1);
+            color: var(--primary);
+        }
+        .compare-table .yes { color: var(--primary); font-weight: 700; }
+        .compare-table .no { color: var(--text-dim); }
+        .compare-table .partial { color: var(--accent); }
+        .compare-table tr:last-child td { border-bottom: none; }
+        .compare-note {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+        .compare-note strong { color: var(--primary); }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            body { cursor: auto; }
+            .cursor-dot, .cursor-ring { display: none; }
+            nav { padding: 10px 20px; }
+            nav .nav-links { display: none; }
+            .feature-card { grid-template-columns: 1fr; }
+            .feature-card.reverse .feature-visual { order: 0; }
+            .feature-info { padding: 32px 24px; }
+            .feature-visual { min-height: 200px; padding: 24px; }
+            .value-grid { grid-template-columns: 1fr; }
+            .hero-stats { gap: 32px; }
+            .problem-grid { grid-template-columns: 1fr; }
+            .why-grid { grid-template-columns: 1fr; }
+            .tech-grid { grid-template-columns: repeat(2, 1fr); }
+            section { padding: 64px 0; }
+        }
+
+        /* ===== Accessibility ===== */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+            .reveal { opacity: 1; transform: none; }
+        }
+
+        a:focus-visible, button:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 4px;
+        }
+
+        ::selection {
+            background: rgba(0, 229, 255, 0.25);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Custom Cursor -->
+<div class="cursor-dot" aria-hidden="true"></div>
+<div class="cursor-ring" aria-hidden="true"></div>
+
+<!-- Nav -->
+<nav>
+    <div class="brand">
+        <span class="brand-logo">
+            <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                    <linearGradient id="navBg" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#0d1320"/>
+                        <stop offset="100%" stop-color="#070a10"/>
+                    </linearGradient>
+                    <radialGradient id="navIris" cx="50%" cy="45%">
+                        <stop offset="0%" stop-color="#7df9ff"/>
+                        <stop offset="50%" stop-color="#00e5ff"/>
+                        <stop offset="100%" stop-color="#006978"/>
+                    </radialGradient>
+                </defs>
+                <rect width="512" height="512" rx="112" fill="url(#navBg)"/>
+                <path d="M 96 256 Q 256 128 416 256 Q 256 384 96 256 Z" fill="none" stroke="#00e5ff" stroke-width="3.5" opacity="0.9"/>
+                <circle cx="256" cy="256" r="76" fill="url(#navIris)"/>
+                <circle cx="256" cy="256" r="34" fill="#050810"/>
+                <ellipse cx="238" cy="238" rx="14" ry="10" fill="rgba(255,255,255,0.7)" transform="rotate(-30 238 238)"/>
+                <circle cx="340" cy="214" r="12" fill="#ffd54f"/>
+            </svg>
+        </span>
+        瞳伴 EyeBuddy
+    </div>
+    <div class="nav-links">
+        <a href="#problem">问题</a>
+        <a href="#features">功能</a>
+        <a href="#tech">技术</a>
+        <a href="#value">价值</a>
+    </div>
+</nav>
+
+<!-- Hero Banner (头图3 · 瞳伴字标头图) -->
+<section class="hero-banner reveal" aria-label="瞳伴 EyeBuddy 品牌头图">
+    <div class="hero-banner-inner">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" role="img" aria-label="瞳伴 EyeBuddy 品牌字标头图">
+            <defs>
+                <linearGradient id="hbg3" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#0a0e14"/>
+                    <stop offset="50%" stop-color="#0d1320"/>
+                    <stop offset="100%" stop-color="#05070b"/>
+                </linearGradient>
+                <radialGradient id="halo3" cx="50%" cy="42%" r="45%">
+                    <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.16"/>
+                    <stop offset="60%" stop-color="#00b8d4" stop-opacity="0.05"/>
+                    <stop offset="100%" stop-color="#00e5ff" stop-opacity="0"/>
+                </radialGradient>
+                <radialGradient id="iris3" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#00e5ff"/>
+                    <stop offset="40%" stop-color="#00b8d4"/>
+                    <stop offset="80%" stop-color="#006978"/>
+                    <stop offset="100%" stop-color="#003a4a"/>
+                </radialGradient>
+                <radialGradient id="buddy3" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#ffd54f"/>
+                    <stop offset="100%" stop-color="#ff8f00"/>
+                </radialGradient>
+                <pattern id="grid3" width="80" height="80" patternUnits="userSpaceOnUse">
+                    <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#00e5ff" stroke-width="0.5" opacity="0.05"/>
+                </pattern>
+                <linearGradient id="bigText" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#ffffff"/>
+                    <stop offset="40%" stop-color="#00e5ff"/>
+                    <stop offset="100%" stop-color="#00b8d4"/>
+                </linearGradient>
+                <filter id="glow3" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="5" result="b"/>
+                    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+                <filter id="soft3" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="18"/>
+                </filter>
+            </defs>
+            <rect width="1920" height="1080" fill="url(#hbg3)"/>
+            <rect width="1920" height="1080" fill="url(#grid3)"/>
+            <ellipse cx="960" cy="450" rx="700" ry="500" fill="url(#halo3)"/>
+            <g stroke="#00e5ff" opacity="0.08">
+                <line x1="0" y1="200" x2="1920" y2="200" stroke-width="1"/>
+                <line x1="0" y1="880" x2="1920" y2="880" stroke-width="1"/>
+            </g>
+            <g stroke="#00e5ff" stroke-width="1" opacity="0.1">
+                <line x1="960" y1="450" x2="200" y2="150"/>
+                <line x1="960" y1="450" x2="1720" y2="150"/>
+                <line x1="960" y1="450" x2="100" y2="540"/>
+                <line x1="960" y1="450" x2="1820" y2="540"/>
+                <line x1="960" y1="450" x2="300" y2="850"/>
+                <line x1="960" y1="450" x2="1620" y2="850"/>
+            </g>
+            <circle cx="960" cy="430" r="280" fill="none" stroke="#00e5ff" stroke-width="1" opacity="0.15" stroke-dasharray="3 10"/>
+            <circle cx="960" cy="430" r="340" fill="none" stroke="#00e5ff" stroke-width="0.5" opacity="0.1"/>
+            <g fill="#00e5ff" opacity="0.5">
+                <circle cx="300" cy="300" r="2"/>
+                <circle cx="1620" cy="320" r="2"/>
+                <circle cx="240" cy="600" r="1.5"/>
+                <circle cx="1680" cy="620" r="1.5"/>
+                <circle cx="500" cy="200" r="1"/>
+                <circle cx="1420" cy="180" r="1"/>
+            </g>
+            <g fill="#ffd54f" opacity="0.6">
+                <circle cx="400" cy="450" r="1.5"/>
+                <circle cx="1520" cy="430" r="1.5"/>
+                <circle cx="600" cy="700" r="1"/>
+                <circle cx="1320" cy="720" r="1"/>
+            </g>
+            <g transform="translate(960 140)">
+                <rect x="-130" y="-22" width="260" height="44" rx="22" fill="none" stroke="#00e5ff" stroke-width="1" opacity="0.5"/>
+                <text x="0" y="7" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="14" font-weight="600" fill="#00e5ff" letter-spacing="4">VISION COMPANION</text>
+            </g>
+            <g transform="translate(960 430)">
+                <ellipse cx="0" cy="0" rx="220" ry="120" fill="#00e5ff" opacity="0.1" filter="url(#soft3)"/>
+                <path d="M -210 0 Q 0 -112 210 0 Q 0 112 -210 0 Z" fill="#0a1218" stroke="#00e5ff" stroke-width="2.5" opacity="0.98"/>
+                <circle cx="0" cy="0" r="92" fill="url(#iris3)" filter="url(#glow3)"/>
+                <circle cx="0" cy="0" r="92" fill="none" stroke="#00e5ff" stroke-width="1" opacity="0.5"/>
+                <circle cx="0" cy="0" r="72" fill="none" stroke="#00b8d4" stroke-width="0.5" opacity="0.4"/>
+                <g stroke="#001a20" stroke-width="0.8" opacity="0.4">
+                    <line x1="0" y1="-92" x2="0" y2="-72"/>
+                    <line x1="0" y1="92" x2="0" y2="72"/>
+                    <line x1="-92" y1="0" x2="-72" y2="0"/>
+                    <line x1="92" y1="0" x2="72" y2="0"/>
+                </g>
+                <circle cx="0" cy="0" r="40" fill="#05080c"/>
+                <circle cx="0" cy="0" r="40" fill="none" stroke="#00e5ff" stroke-width="0.8" opacity="0.5"/>
+                <circle cx="-14" cy="-14" r="12" fill="#ffffff" opacity="0.85"/>
+                <circle cx="14" cy="12" r="4" fill="#ffffff" opacity="0.4"/>
+                <circle cx="32" cy="-26" r="6" fill="url(#buddy3)" filter="url(#glow3)"/>
+                <g stroke="#00e5ff" stroke-width="2" stroke-linecap="round" opacity="0.6">
+                    <line x1="-170" y1="-72" x2="-185" y2="-100"/>
+                    <line x1="-110" y1="-98" x2="-120" y2="-130"/>
+                    <line x1="-55" y1="-108" x2="-58" y2="-140"/>
+                    <line x1="0" y1="-112" x2="0" y2="-145"/>
+                    <line x1="55" y1="-108" x2="58" y2="-140"/>
+                    <line x1="110" y1="-98" x2="120" y2="-130"/>
+                    <line x1="170" y1="-72" x2="185" y2="-100"/>
+                </g>
+            </g>
+            <g transform="translate(960 700)">
+                <text x="0" y="0" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="120" font-weight="900" fill="url(#bigText)" letter-spacing="6">瞳伴</text>
+                <text x="0" y="80" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', sans-serif" font-size="44" font-weight="700" fill="#ffffff" letter-spacing="12" opacity="0.92">EyeBuddy</text>
+            </g>
+            <g transform="translate(960 840)">
+                <line x1="-200" y1="0" x2="-40" y2="0" stroke="#00e5ff" stroke-width="1" opacity="0.5"/>
+                <circle cx="0" cy="0" r="3" fill="#ffd54f"/>
+                <line x1="40" y1="0" x2="200" y2="0" stroke="#00e5ff" stroke-width="1" opacity="0.5"/>
+                <text x="0" y="40" text-anchor="middle" font-family="-apple-system, 'PingFang SC', sans-serif" font-size="20" font-weight="500" fill="#8b9bb4" letter-spacing="3">看不见图 · 找不到鼠标 · 分不清颜色 · 读不到文字</text>
+                <text x="0" y="72" text-anchor="middle" font-family="-apple-system, 'PingFang SC', sans-serif" font-size="22" font-weight="700" fill="#00e5ff" letter-spacing="4">一个插件，一站解决</text>
+            </g>
+            <g transform="translate(80 1000)" opacity="0.5">
+                <text x="0" y="0" font-family="-apple-system, sans-serif" font-size="13" font-weight="600" fill="#5a6a82" letter-spacing="3">© 2026 EYEBUDDY · BY WEIHAO WU</text>
+            </g>
+            <g transform="translate(1840 1000)" opacity="0.5">
+                <text x="0" y="0" text-anchor="end" font-family="-apple-system, sans-serif" font-size="13" font-weight="600" fill="#5a6a82" letter-spacing="3">TRAE AI CREATIVITY CONTEST</text>
+            </g>
+        </svg>
+    </div>
+</section>
+
+<!-- Hero -->
+<header class="hero">
+    <div class="hero-badge reveal">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        TRAE AI 创造力大赛 · 社会服务 + 社会公益
+    </div>
+    <h1 class="reveal reveal-delay-1">瞳伴 EyeBuddy</h1>
+    <p class="tagline reveal reveal-delay-2">看不见图、找不到鼠标、分不清颜色、看不清文字？<br>一个插件，四种功能，一站解决。</p>
+    <div class="hero-stats reveal reveal-delay-3">
+        <div class="hero-stat">
+            <div class="num">1700万</div>
+            <div class="label">全盲 / 重度视障</div>
+        </div>
+        <div class="hero-stat">
+            <div class="num">数千万</div>
+            <div class="label">低视力人群</div>
+        </div>
+        <div class="hero-stat">
+            <div class="num">6000万+</div>
+            <div class="label">色盲色弱</div>
+        </div>
+        <div class="hero-stat">
+            <div class="num">¥0</div>
+            <div class="label">使用成本</div>
+        </div>
+    </div>
+    <div class="scroll-hint" aria-hidden="true">
+        <span>向下滚动</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+</header>
+
+<!-- Why (作者故事) -->
+<section class="why-section" id="why">
+    <div class="container">
+        <div class="reveal">
+            <span class="section-label">为什么做</span>
+            <h2 class="section-title">不是抽象的痛点，是我亲历的场景</h2>
+        </div>
+        <p class="why-intro reveal">
+            我长期参与无障碍和助老志愿活动。<strong>瞳伴的每一个功能，都对应一个我亲眼见过的真实困境。</strong>这些不是市场调研出来的需求，是视障朋友上网时的真实生活。
+        </p>
+        <div class="why-grid">
+            <div class="why-card reveal">
+                <p class="why-quote">"在志愿活动中，我见过一位全盲用户对着一张产品图发呆——屏幕阅读器只读出了 'image'，他不知道图里是什么。"</p>
+                <span class="why-link">→ AI 页面描述</span>
+            </div>
+            <div class="why-card reveal reveal-delay-1">
+                <p class="why-quote">"一位低视力老人用读屏软件听新闻，朗读到第 3 段时，他的眼睛还在第 1 段——不知道正在读哪里。"</p>
+                <span class="why-link">→ 文字朗读 + 高亮</span>
+            </div>
+            <div class="why-card reveal reveal-delay-2">
+                <p class="why-quote">"一位低视力用户找不到鼠标光标，急得在屏幕上乱划——'我明明在动，怎么就是看不见指针？'"</p>
+                <span class="why-link">→ 鼠标十字准星</span>
+            </div>
+            <div class="why-card reveal reveal-delay-3">
+                <p class="why-quote">"一位色盲朋友把红色警告按钮当成绿色，错过了重要提示——'我以为那是确认键，谁知道是警告？'"</p>
+                <span class="why-link">→ 色盲校正</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Problem -->
+<section id="problem">
+    <div class="container">
+        <div class="reveal">
+            <span class="section-label">问题</span>
+            <h2 class="section-title">三类人，四个困境</h2>
+            <p class="section-desc">中国近亿视障群体被数字鸿沟隔绝，现有工具各自为战。</p>
+        </div>
+        <div class="problem-grid">
+            <div class="problem-card reveal">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                <h3>看不见图</h3>
+                <div class="people">全盲 / 重度视障 · 1700万</div>
+                <p>屏幕阅读器只能读文字，遇到图片、图表、复杂布局就"哑巴"了。Chrome 内置 AI 描述依赖 Google 服务，国内不可用。</p>
+            </div>
+            <div class="problem-card reveal reveal-delay-1">
+                <svg viewBox="0 0 24 24"><path d="M3 3l7 7M3 8V3h5M21 21l-7-7M21 16v5h-5"/><circle cx="12" cy="12" r="2"/></svg>
+                <h3>看不清文字</h3>
+                <div class="people">低视力 / 老年 · 数千万</div>
+                <p>看得见屏幕但看不清文字，想听内容却没有朗读工具。现有读屏软件朗读时没有高亮标记，不知道正在读哪段。</p>
+            </div>
+            <div class="problem-card reveal reveal-delay-2">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                <h3>找不到鼠标</h3>
+                <div class="people">低视力 / 老年 · 数千万</div>
+                <p>看得见屏幕但看不清，鼠标一不留神就丢在角落再也找不回来。Windows 放大镜太粗糙，没有专门的定位辅助。</p>
+            </div>
+            <div class="problem-card reveal reveal-delay-3">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 0 0 20z" fill="currentColor" opacity="0.2"/></svg>
+                <h3>分不清颜色</h3>
+                <div class="people">色盲 / 色弱 · 6000万+</div>
+                <p>红绿不分、图表颜色无意义、表单验证色看不出。Chrome 色盲插件只是纯滤镜，没有 AI，没有鼠标增强。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+    <div class="container">
+        <div class="reveal">
+            <span class="section-label">功能</span>
+            <h2 class="section-title">四种功能，一个插件</h2>
+            <p class="section-desc">不是多个插件的拼凑，是深度整合的无障碍体验。</p>
+        </div>
+
+        <!-- Feature 1: AI Description -->
+        <div class="feature-card reveal">
+            <div class="feature-info">
+                <span class="feature-tag">服务全盲 / 重度视障</span>
+                <h3>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 3v2M15 3v2M9 19v2M15 19v2M3 9h2M3 15h2M19 9h2M19 15h2"/></svg>
+                    AI 页面描述
+                </h3>
+                <p>截取网页画面，通义千问 Qwen-VL 生成中文描述，语音播报给用户。不替代屏幕阅读器，而是增强它——让图片能"听"到。</p>
+                <ul>
+                    <li>一键截图分析，描述整个页面布局和内容</li>
+                    <li>通义千问 Qwen-VL，中文描述质量最佳</li>
+                    <li>自动语音播报，与文字朗读功能联动</li>
+                    <li>免费 100 万 tokens/月，零成本</li>
+                </ul>
+            </div>
+            <div class="feature-visual">
+                <div class="ai-demo">
+                    <div class="ai-label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                        AI 描述结果
+                    </div>
+                    <div class="ai-text">这是一个新闻网站首页。顶部有导航栏，包含"首页"、"国际"、"科技"等栏目。中间区域是一张大幅新闻图片，展示城市天际线。下方有标题"今日要闻"和三篇新闻摘要列表<span class="ai-typing"></span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 2: Text Reader -->
+        <div class="feature-card reverse reveal">
+            <div class="feature-info">
+                <span class="feature-tag">服务全盲 / 低视力</span>
+                <h3>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+                    文字朗读 + 高亮
+                </h3>
+                <p>悬停段落自动朗读，选中文字即时朗读。朗读时黄色高亮标记正在读的内容，让用户清楚地知道正在读哪段文字。</p>
+                <ul>
+                    <li>悬停 0.5 秒自动朗读段落文字</li>
+                    <li>选中任意文字立即朗读</li>
+                    <li>黄色背景 + 边框高亮正在朗读的元素</li>
+                    <li>Web Speech API，浏览器内置零成本</li>
+                    <li>中文优先（zh-CN），0.9 倍语速</li>
+                </ul>
+            </div>
+            <div class="feature-visual">
+                <div class="reader-demo">
+                    <div class="rd-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                        正在朗读
+                    </div>
+                    <div class="rd-paragraph">这是一段普通的网页文字，用户没有悬停时显示为默认样式。</div>
+                    <div class="rd-paragraph highlighted">这段文字正在被朗读，黄色高亮标记让低视力用户也能清楚看到正在读的内容。</div>
+                    <div class="rd-paragraph">朗读结束后高亮自动消失，恢复原始样式。</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 3: Crosshair -->
+        <div class="feature-card reveal">
+            <div class="feature-info">
+                <span class="feature-tag">服务低视力 / 老年</span>
+                <h3>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                    鼠标十字准星
+                </h3>
+                <p>全屏贯穿青色十字线，帮助低视力用户一眼定位鼠标位置。8px 空心圆环交汇点确保精准点击时不被线挡住。</p>
+                <ul>
+                    <li>亮青色 #00FFFF，网页中极少出现，天然高对比</li>
+                    <li>2px 粗细 + 全屏贯穿，低于看不清高于挡视线</li>
+                    <li>同色 4px 发光阴影，任何背景都可见</li>
+                    <li>快捷键 Ctrl+Shift+X + 控制面板双控开关</li>
+                </ul>
+            </div>
+            <div class="feature-visual">
+                <div class="crosshair-demo">
+                    <div class="ch-v"></div>
+                    <div class="ch-h"></div>
+                    <div class="ch-dot"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 4: Color Blind -->
+        <div class="feature-card reverse reveal">
+            <div class="feature-info">
+                <span class="feature-tag">服务色盲 / 色弱</span>
+                <h3>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 22a10 10 0 0 1-10-10C2 6.5 6.5 2 12 2"/></svg>
+                    色盲校正
+                </h3>
+                <p>SVG 色彩矩阵滤镜，三种模式一键切换，覆盖最常见色盲类型。纯 CSS 实现，零 API 调用，即时生效。</p>
+                <ul>
+                    <li>红绿色盲（protanopia）— 覆盖 99% 色盲者</li>
+                    <li>绿色弱（deuteranomaly）— 最常见类型</li>
+                    <li>蓝黄色盲（tritanopia）— 覆盖完整性</li>
+                    <li>控制面板按钮切换，所见即所得</li>
+                </ul>
+            </div>
+            <div class="feature-visual">
+                <div class="cb-demo">
+                    <div class="cb-block cb-red">红</div>
+                    <div class="cb-block cb-green">绿</div>
+                    <div class="cb-block cb-blue">蓝</div>
+                    <div class="cb-block cb-yellow">黄</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Try (立即体验) -->
+<section class="try-section" id="try">
+    <div class="container">
+        <div class="reveal">
+            <span class="section-label">立即体验</span>
+            <h2 class="section-title">不用安装，直接试</h2>
+            <p class="section-desc">三个功能在此页面直接体验，无需安装插件。</p>
+        </div>
+        <div class="try-grid">
+            <!-- AI 描述模拟 -->
+            <div class="try-card reveal">
+                <h3>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+                    AI 描述模拟
+                </h3>
+                <div class="try-sample-img" style="background: linear-gradient(135deg, #1e3a5f 0%, #00b8d4 50%, #ffd54f 100%);">示例图片</div>
+                <p class="try-desc">点击按钮模拟 AI 视觉描述（真实插件调用通义千问 Qwen-VL 生成）。</p>
+                <button class="try-btn" id="try-ai-btn">AI 描述这张图</button>
+                <div class="try-output" id="try-ai-output"></div>
+            </div>
+
+            <!-- 文字朗读真实体验 -->
+            <div class="try-card reveal reveal-delay-1">
+                <h3>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    文字朗读体验
+                </h3>
+                <div class="try-sample-text">瞳伴 EyeBuddy 是一款浏览器无障碍插件，服务视障人群。悬停段落自动朗读，黄色高亮标记正在读的内容。</div>
+                <p class="try-desc">点击按钮调用浏览器内置 Web Speech API 真实朗读（与插件功能完全一致）。</p>
+                <button class="try-btn" id="try-tts-btn">朗读这段文字</button>
+                <div class="try-output" id="try-tts-output"></div>
+            </div>
+
+            <!-- 色盲滤镜实时切换 -->
+            <div class="try-card reveal reveal-delay-2">
+                <h3>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/></svg>
+                    色盲滤镜切换
+                </h3>
+                <div class="try-sample-img" id="try-cb-img" style="background: linear-gradient(90deg, #ef4444 0%, #22c55e 33%, #3b82f6 66%, #eab308 100%);">彩色光谱</div>
+                <p class="try-desc">点击按钮对上方色块应用 SVG 色彩矩阵滤镜（与插件功能一致）。</p>
+                <div class="try-filters">
+                    <button class="try-filter-btn active" data-cb="off">正常</button>
+                    <button class="try-filter-btn" data-cb="protanopia">红绿色盲</button>
+                    <button class="try-filter-btn" data-cb="deuteranomaly">绿色弱</button>
+                    <button class="try-filter-btn" data-cb="tritanopia">蓝黄色盲</button>
+                </div>
+                <div class="try-output visible" id="try-cb-output">当前：正常视觉</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Quote -->
+<section class="quote-section">
+    <div class="container reveal">
+        <blockquote>
+            "我长期参与无障碍和助老志愿活动，亲眼见过视障朋友上网时的真实困境——鼠标丢了找不回来、图表颜色分不清、图片完全'听'不到、文字看不清也没有朗读反馈。这些不是抽象的痛点，是我真实见过的场景。"
+        </blockquote>
+        <div class="source">— 瞳伴 EyeBuddy 创作者</div>
+    </div>
+</section>
+
+<!-- Tech -->
+<section id="tech">
+    <div class="container">
+        <div class="reveal">
+            <span class="section-label">技术</span>
+            <h2 class="section-title">技术方案</h2>
+            <p class="section-desc">纯前端实现，零硬件成本，免费 API。</p>
+        </div>
+        <div class="tech-grid">
+            <div class="tech-card reveal">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <h4>Manifest V3</h4>
+                <p>Chrome 插件标准</p>
+            </div>
+            <div class="tech-card reveal reveal-delay-1">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4M8 16h.01M16 16h.01"/></svg>
+                <h4>Qwen-VL</h4>
+                <p>多模态 AI</p>
+            </div>
+            <div class="tech-card reveal reveal-delay-1">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+                <h4>Web Speech API</h4>
+                <p>语音合成引擎</p>
+            </div>
+            <div class="tech-card reveal reveal-delay-2">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="10.5" r="2.5"/><circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="12.5" r="2.5"/><path d="M12 22a10 10 0 0 1-10-10C2 6.5 6.5 2 12 2"/></svg>
+                <h4>SVG 滤镜</h4>
+                <p>色盲色彩矩阵</p>
+            </div>
+            <div class="tech-card reveal reveal-delay-2">
+                <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <h4>captureVisibleTab</h4>
+                <p>网页截图 API</p>
+            </div>
+            <div class="tech-card reveal reveal-delay-3">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <h4>¥0 成本</h4>
+                <p>免费 API + 纯前端</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Value -->
+<section id="value">
+    <div class="container">
+        <div class="reveal">
+            <span class="section-label">价值</span>
+            <h2 class="section-title">价值与意义</h2>
+            <p class="section-desc">不是锦上添花，是让近亿人能平等上网的基础设施。</p>
+        </div>
+        <div class="value-grid">
+            <div class="value-card reveal">
+                <h3>社会价值</h3>
+                <p>中国有近亿人的视障群体被数字鸿沟隔绝。瞳伴不替代任何现有工具，而是增强它们——视障人士继续用 NVDA/争渡，装上瞳伴后，图片能"听"到了，文字能"读"了，鼠标能"找"到了，颜色能"分"了。一个插件，四种功能，一站解决。</p>
+            </div>
+            <div class="value-card reveal reveal-delay-1">
+                <h3>商业价值</h3>
+                <p>基础版免费（通义千问免费 API + 纯前端实现，零边际成本），Pro 版可订阅更多 AI 配额和自定义准星样式，企业版可卖无障碍合规检测服务。色盲校正和鼠标准星零 API 成本，天然适合免费获客 + 增值变现。</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Compare (竞品对比) -->
+<section class="compare-section" id="compare">
+    <div class="container">
+        <div class="reveal">
+            <span class="section-label">竞品对比</span>
+            <h2 class="section-title">市场空白，一目了然</h2>
+            <p class="section-desc">没有任何一款产品在浏览器插件形态下同时整合这四项功能。</p>
+        </div>
+        <div class="compare-table-wrap reveal">
+            <table class="compare-table">
+                <thead>
+                    <tr>
+                        <th>功能 / 产品</th>
+                        <th class="col-eyebuddy header">瞳伴 EyeBuddy</th>
+                        <th>Be My Eyes</th>
+                        <th>Seeing AI</th>
+                        <th>NVDA</th>
+                        <th>Chrome Color Enhancer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>AI 页面描述（网页截屏）</td>
+                        <td class="col-eyebuddy yes">✅</td>
+                        <td class="no">❌ 真实世界</td>
+                        <td class="no">❌ 真实世界</td>
+                        <td class="no">❌</td>
+                        <td class="no">❌</td>
+                    </tr>
+                    <tr>
+                        <td>文字朗读 + 视觉高亮</td>
+                        <td class="col-eyebuddy yes">✅</td>
+                        <td class="no">❌</td>
+                        <td class="no">❌</td>
+                        <td class="partial">⚠️ 仅语音</td>
+                        <td class="no">❌</td>
+                    </tr>
+                    <tr>
+                        <td>鼠标十字准星</td>
+                        <td class="col-eyebuddy yes">✅</td>
+                        <td class="no">❌</td>
+                        <td class="no">❌</td>
+                        <td class="no">❌</td>
+                        <td class="no">❌</td>
+                    </tr>
+                    <tr>
+                        <td>色盲校正</td>
+                        <td class="col-eyebuddy yes">✅</td>
+                        <td class="no">❌</td>
+                        <td class="no">❌</td>
+                        <td class="no">❌</td>
+                        <td class="yes">✅</td>
+                    </tr>
+                    <tr>
+                        <td>形态</td>
+                        <td class="col-eyebuddy">浏览器插件</td>
+                        <td>移动 App</td>
+                        <td>移动 App</td>
+                        <td>系统级软件</td>
+                        <td>浏览器插件</td>
+                    </tr>
+                    <tr>
+                        <td>中文本土化</td>
+                        <td class="col-eyebuddy yes">✅</td>
+                        <td class="partial">⚠️</td>
+                        <td class="no">❌</td>
+                        <td class="partial">⚠️</td>
+                        <td class="no">❌</td>
+                    </tr>
+                    <tr>
+                        <td>四功能整合</td>
+                        <td class="col-eyebuddy yes">✅ 唯一</td>
+                        <td class="no">❌ 单功能</td>
+                        <td class="no">❌ 单功能</td>
+                        <td class="no">❌ 单功能</td>
+                        <td class="no">❌ 单功能</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="compare-note reveal">数据来源：2026-07-07 市场调研（7 维度 20+ 款产品交叉验证）· <strong>瞳伴是唯一一款四功能整合的浏览器无障碍插件</strong></p>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer>
+    <h2 class="reveal">瞳伴 EyeBuddy</h2>
+    <p class="reveal reveal-delay-1">一个插件，四种功能，一站解决</p>
+    <div class="badges reveal reveal-delay-2">
+        <span class="badge">社会服务赛道</span>
+        <span class="badge">社会公益附加赛题</span>
+        <span class="badge">TRAE AI 创造力大赛</span>
+    </div>
+    <div class="author reveal reveal-delay-3">
+        <div class="author-line">作者 <strong>Weihao Wu</strong> · 无障碍志愿者 · 南方科技大学致诚书院「橙光」志愿服务队</div>
+        <div class="author-links">
+            <a href="https://forum.trae.cn/u/%E7%94%A8%E6%88%B732724/summary" target="_blank" rel="noopener" class="author-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <span>TRAE 社区 @用户32724</span>
+            </a>
+            <a href="https://github.com/Wayhhow" target="_blank" rel="noopener" class="author-link">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 5 18 5.3 18 5.3c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+                <span>GitHub @Wayhhow</span>
+            </a>
+        </div>
+        <p class="author-quote">"我见过视障朋友上网时的真实困境——这些不是抽象的痛点，是我亲历的场景。"</p>
+    </div>
+    <p class="copyright reveal reveal-delay-3">© 2026 瞳伴 EyeBuddy · TRAE AI 创造力大赛参赛作品</p>
+</footer>
+
+<script>
+    // ===== Custom Cursor =====
+    (function() {
+        if (window.matchMedia('(max-width: 768px)').matches) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        const dot = document.querySelector('.cursor-dot');
+        const ring = document.querySelector('.cursor-ring');
+        let mx = 0, my = 0, rx = 0, ry = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            mx = e.clientX; my = e.clientY;
+            dot.style.transform = `translate(${mx}px, ${my}px) translate(-50%, -50%)`;
+        });
+
+        function animate() {
+            rx += (mx - rx) * 0.15;
+            ry += (my - ry) * 0.15;
+            ring.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -50%)`;
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        document.querySelectorAll('a, button, .problem-card, .feature-card, .tech-card').forEach(el => {
+            el.addEventListener('mouseenter', () => ring.classList.add('hover'));
+            el.addEventListener('mouseleave', () => ring.classList.remove('hover'));
+        });
+    })();
+
+    // ===== Scroll Reveal =====
+    (function() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    })();
+
+    // ===== Text Reader Demo Animation =====
+    (function() {
+        const paragraphs = document.querySelectorAll('.reader-demo .rd-paragraph');
+        if (paragraphs.length === 0) return;
+        let idx = 0;
+        setInterval(() => {
+            paragraphs.forEach(p => p.classList.remove('highlighted'));
+            if (paragraphs[idx]) paragraphs[idx].classList.add('highlighted');
+            idx = (idx + 1) % paragraphs.length;
+        }, 2500);
+    })();
+
+    // ===== Try Section: AI 描述模拟 =====
+    (function() {
+        const btn = document.getElementById('try-ai-btn');
+        const output = document.getElementById('try-ai-output');
+        if (!btn || !output) return;
+        const descriptions = [
+            '这是一张展示色彩渐变的图片。画面从左上深蓝色过渡到中间的青色，再到右下的暖黄色，整体呈现明亮通透的视觉风格，类似城市天际线在日落时分的色彩变化。',
+            '图片展示了一个抽象的色彩组合，包含蓝色、青色和黄色三种主色调。色彩边界柔和过渡，没有明显的几何形状，整体给人科技感和未来感。'
+        ];
+        let descIdx = 0;
+        btn.addEventListener('click', () => {
+            btn.classList.add('active');
+            btn.textContent = 'AI 分析中...';
+            output.classList.remove('visible');
+            setTimeout(() => {
+                output.textContent = '🔍 ' + descriptions[descIdx];
+                descIdx = (descIdx + 1) % descriptions.length;
+                output.classList.add('visible');
+                btn.classList.remove('active');
+                btn.textContent = '再试一次';
+            }, 1200);
+        });
+    })();
+
+    // ===== Try Section: 文字朗读真实体验 =====
+    (function() {
+        const btn = document.getElementById('try-tts-btn');
+        const output = document.getElementById('try-tts-output');
+        const sampleText = '瞳伴 EyeBuddy 是一款浏览器无障碍插件，服务视障人群。悬停段落自动朗读，黄色高亮标记正在读的内容。';
+        if (!btn || !output) return;
+        if (!('speechSynthesis' in window)) {
+            output.textContent = '⚠️ 当前浏览器不支持 Web Speech API';
+            output.classList.add('visible');
+            btn.disabled = true;
+            return;
+        }
+        btn.addEventListener('click', () => {
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel();
+                btn.classList.remove('active');
+                btn.textContent = '朗读这段文字';
+                output.classList.remove('visible');
+                return;
+            }
+            const utter = new SpeechSynthesisUtterance(sampleText);
+            utter.lang = 'zh-CN';
+            utter.rate = 0.9;
+            const voices = window.speechSynthesis.getVoices();
+            const zh = voices.find(v => v.lang.startsWith('zh'));
+            if (zh) utter.voice = zh;
+            utter.onstart = () => {
+                btn.classList.add('active');
+                btn.textContent = '停止朗读';
+                output.textContent = '🔊 正在朗读...（与插件功能完全一致）';
+                output.classList.add('visible');
+            };
+            utter.onend = () => {
+                btn.classList.remove('active');
+                btn.textContent = '再听一次';
+                output.textContent = '✅ 朗读完成';
+            };
+            window.speechSynthesis.speak(utter);
+        });
+    })();
+
+    // ===== Try Section: 色盲滤镜实时切换 =====
+    (function() {
+        const img = document.getElementById('try-cb-img');
+        const output = document.getElementById('try-cb-output');
+        const buttons = document.querySelectorAll('.try-filter-btn');
+        if (!img || !output || buttons.length === 0) return;
+
+        const matrices = {
+            protanopia: '0.567 0.433 0 0 0 0.558 0.442 0 0 0 0 0.242 0.758 0 0 0 0 0 1 0',
+            deuteranomaly: '0.8 0.2 0 0 0 0.258 0.742 0 0 0 0 0.142 0.858 0 0 0 0 0 1 0',
+            tritanopia: '0.95 0.05 0 0 0 0 0.433 0.567 0 0 0 0.475 0.525 0 0 0 0 0 1 0'
+        };
+        const labels = {
+            off: '正常视觉',
+            protanopia: '红绿色盲（protanopia）',
+            deuteranomaly: '绿色弱（deuteranomaly）',
+            tritanopia: '蓝黄色盲（tritanopia）'
+        };
+
+        const svgId = 'try-cb-svg';
+        if (!document.getElementById(svgId)) {
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.id = svgId;
+            svg.style.cssText = 'position:absolute;width:0;height:0;';
+            for (const [mode, values] of Object.entries(matrices)) {
+                const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+                filter.id = 'try-' + mode;
+                const fe = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
+                fe.setAttribute('type', 'matrix');
+                fe.setAttribute('values', values);
+                filter.appendChild(fe);
+                svg.appendChild(filter);
+            }
+            document.documentElement.appendChild(svg);
+        }
+
+        buttons.forEach(b => {
+            b.addEventListener('click', () => {
+                buttons.forEach(x => x.classList.remove('active'));
+                b.classList.add('active');
+                const mode = b.dataset.cb;
+                if (mode === 'off') {
+                    img.style.filter = '';
+                } else {
+                    img.style.filter = `url(#try-${mode})`;
+                }
+                output.textContent = '当前：' + labels[mode];
+            });
+        });
+    })();
+</script>
+
+</body>
+</html>
