@@ -1,180 +1,221 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>瞳伴 EyeBuddy · 语音助手（演示）</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, "Microsoft YaHei", sans-serif;
-      background: #070a10;
-      color: #e8eef5;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 30px;
-    }
-    h1 { font-size: 30px; display: flex; align-items: center; gap: 12px; }
-    .sub { font-size: 16px; color: #8b9bb4; margin: 12px 0 40px; }
-    .assistant {
-      width: 100%;
-      max-width: 640px;
-      background: #0d1320;
-      border: 1px solid rgba(0, 229, 255, 0.25);
-      border-radius: 20px;
-      padding: 28px;
-      box-shadow: 0 10px 60px rgba(0, 229, 255, 0.12);
-    }
-    .chat {
-      min-height: 120px;
-      margin-bottom: 22px;
-      font-size: 18px;
-      line-height: 1.7;
-    }
-    .msg { margin-bottom: 12px; }
-    .msg.ai { color: #7df9ff; }
-    .msg.user { color: #e8eef5; }
-    .msg.hidden { display: none; }
-    .input-row {
-      display: flex;
-      gap: 12px;
-      align-items: stretch;
-    }
-    #voice-input {
-      flex: 1;
-      font-size: 18px;
-      padding: 14px 16px;
-      border-radius: 12px;
-      border: 1px solid #233046;
-      background: #0a0f1a;
-      color: #e8eef5;
-      outline: none;
-    }
-    #voice-input:focus { border-color: #00e5ff; }
-    .mic-btn, .send-btn {
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      font-size: 17px;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-    .mic-btn {
-      width: 58px;
-      background: #101828;
-      font-size: 26px;
-    }
-    .mic-btn.listening {
-      background: rgba(255, 70, 70, 0.18);
-      animation: pulse 0.9s infinite;
-    }
-    @keyframes pulse {
-      0%   { box-shadow: 0 0 0 0 rgba(255, 80, 80, 0.55); }
-      70%  { box-shadow: 0 0 0 16px rgba(255, 80, 80, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(255, 80, 80, 0); }
-    }
-    .send-btn {
-      padding: 0 26px;
-      background: #00b8d4;
-      color: #04141a;
-    }
-    .send-btn:hover { background: #00e5ff; }
-    .status {
-      margin-top: 14px;
-      font-size: 14px;
-      color: #5a6a82;
-      min-height: 20px;
-    }
-    .status.listening { color: #ff8080; }
-    .jump-tip {
-      margin-top: 16px;
-      display: none;
-      font-size: 17px;
-      color: #7fe8a4;
-    }
-    .jump-tip a { color: #7df9ff; font-weight: 600; }
-  </style>
-</head>
-<body>
-  <h1>🎤 瞳伴语音助手</h1>
-  <p class="sub">动动嘴，就能操作浏览器 —— 说「帮我打开bilibili」试试</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>瞳伴 EyeBuddy · 语音助手（演示）</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, "Microsoft YaHei", sans-serif;
+        background: #070a10;
+        color: #e8eef5;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 30px;
+      }
+      h1 {
+        font-size: 30px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .sub {
+        font-size: 16px;
+        color: #8b9bb4;
+        margin: 12px 0 40px;
+      }
+      .assistant {
+        width: 100%;
+        max-width: 640px;
+        background: #0d1320;
+        border: 1px solid rgba(0, 229, 255, 0.25);
+        border-radius: 20px;
+        padding: 28px;
+        box-shadow: 0 10px 60px rgba(0, 229, 255, 0.12);
+      }
+      .chat {
+        min-height: 120px;
+        margin-bottom: 22px;
+        font-size: 18px;
+        line-height: 1.7;
+      }
+      .msg {
+        margin-bottom: 12px;
+      }
+      .msg.ai {
+        color: #7df9ff;
+      }
+      .msg.user {
+        color: #e8eef5;
+      }
+      .msg.hidden {
+        display: none;
+      }
+      .input-row {
+        display: flex;
+        gap: 12px;
+        align-items: stretch;
+      }
+      #voice-input {
+        flex: 1;
+        font-size: 18px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid #233046;
+        background: #0a0f1a;
+        color: #e8eef5;
+        outline: none;
+      }
+      #voice-input:focus {
+        border-color: #00e5ff;
+      }
+      .mic-btn,
+      .send-btn {
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-size: 17px;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      .mic-btn {
+        width: 58px;
+        background: #101828;
+        font-size: 26px;
+      }
+      .mic-btn.listening {
+        background: rgba(255, 70, 70, 0.18);
+        animation: pulse 0.9s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(255, 80, 80, 0.55);
+        }
+        70% {
+          box-shadow: 0 0 0 16px rgba(255, 80, 80, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(255, 80, 80, 0);
+        }
+      }
+      .send-btn {
+        padding: 0 26px;
+        background: #00b8d4;
+        color: #04141a;
+      }
+      .send-btn:hover {
+        background: #00e5ff;
+      }
+      .status {
+        margin-top: 14px;
+        font-size: 14px;
+        color: #5a6a82;
+        min-height: 20px;
+      }
+      .status.listening {
+        color: #ff8080;
+      }
+      .jump-tip {
+        margin-top: 16px;
+        display: none;
+        font-size: 17px;
+        color: #7fe8a4;
+      }
+      .jump-tip a {
+        color: #7df9ff;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🎤 瞳伴语音助手</h1>
+    <p class="sub">动动嘴，就能操作浏览器 —— 说出你的指令试试</p>
 
-  <div class="assistant">
-    <div class="chat">
-      <div class="msg ai" id="ai-hint">你好，我是瞳伴语音助手。点击右侧麦克风，或直接输入指令。</div>
-      <div class="msg user hidden" id="user-echo"></div>
-      <div class="msg ai hidden" id="ai-reply"></div>
+    <div class="assistant">
+      <div class="chat">
+        <div class="msg ai" id="ai-hint">
+          你好，我是瞳伴语音助手。点击右侧麦克风，或直接输入指令。
+        </div>
+        <div class="msg user hidden" id="user-echo"></div>
+        <div class="msg ai hidden" id="ai-reply"></div>
+      </div>
+
+      <div class="input-row">
+        <input
+          type="text"
+          id="voice-input"
+          placeholder="说出你的指令，例如：帮我打开一个网站"
+          aria-label="语音指令输入框"
+          autocomplete="off"
+        />
+        <button class="mic-btn" id="mic-btn" title="语音识别（演示）">
+          🎙️
+        </button>
+        <button class="send-btn" id="send-btn">发送</button>
+      </div>
+
+      <div class="status" id="status">支持语音识别与文字输入</div>
+      <div class="jump-tip" id="jump-tip"></div>
     </div>
 
-    <div class="input-row">
-      <input type="text" id="voice-input" placeholder="例如：帮我打开bilibili"
-             aria-label="语音指令输入框" autocomplete="off">
-      <button class="mic-btn" id="mic-btn" title="语音识别（演示）">🎙️</button>
-      <button class="send-btn" id="send-btn">发送</button>
-    </div>
+    <script>
+      const micBtn = document.getElementById("mic-btn");
+      const sendBtn = document.getElementById("send-btn");
+      const input = document.getElementById("voice-input");
+      const statusEl = document.getElementById("status");
+      const aiHint = document.getElementById("ai-hint");
+      const aiReply = document.getElementById("ai-reply");
+      const userEcho = document.getElementById("user-echo");
+      const jumpTip = document.getElementById("jump-tip");
 
-    <div class="status" id="status">支持示例：帮我打开bilibili · 帮我打开B站</div>
-    <div class="jump-tip" id="jump-tip"></div>
-  </div>
+      // —— 演示逻辑：不管说什么，都“执行”同一条指令 ——
+      function runCommand(text) {
+        const t = (text || "").trim();
+        if (!t) return;
+        userEcho.textContent = "你：" + t;
+        userEcho.classList.remove("hidden");
+        aiReply.classList.remove("hidden");
+        jumpTip.style.display = "none";
 
-  <script>
-    const micBtn = document.getElementById("mic-btn");
-    const sendBtn = document.getElementById("send-btn");
-    const input = document.getElementById("voice-input");
-    const statusEl = document.getElementById("status");
-    const aiHint = document.getElementById("ai-hint");
-    const aiReply = document.getElementById("ai-reply");
-    const userEcho = document.getElementById("user-echo");
-    const jumpTip = document.getElementById("jump-tip");
-
-    // —— 硬编码演示指令：唯一支持的“技能” ——
-    const DEMO_COMMAND = /bilibili|b站/i;
-
-    function runCommand(text) {
-      const t = (text || "").trim();
-      if (!t) return;
-      userEcho.textContent = "你：" + t;
-      userEcho.classList.remove("hidden");
-      aiReply.classList.remove("hidden");
-      jumpTip.style.display = "none";
-
-      if (DEMO_COMMAND.test(t)) {
         aiReply.textContent = "好的，正在为你打开 bilibili…";
         const win = window.open("https://www.bilibili.com", "_blank");
         if (!win) {
           // 浏览器拦截弹窗时给出可点击的兜底链接
-          jumpTip.innerHTML = '弹窗被浏览器拦截，<a href="https://www.bilibili.com" target="_blank">点这里打开 bilibili ↗</a>';
+          jumpTip.innerHTML =
+            '弹窗被浏览器拦截，<a href="https://www.bilibili.com" target="_blank">点这里打开 bilibili ↗</a>';
           jumpTip.style.display = "block";
         }
-      } else {
-        aiReply.textContent = "这个演示版只听得懂一句：帮我打开bilibili";
       }
-    }
 
-    // —— 麦克风：假装识别，1.2 秒后自动“听”到指令 ——
-    micBtn.addEventListener("click", () => {
-      if (micBtn.classList.contains("listening")) return;
-      micBtn.classList.add("listening");
-      statusEl.textContent = "正在聆听…（演示识别）";
-      statusEl.classList.add("listening");
-      input.value = "";
+      // —— 麦克风：假装识别，1.2 秒后自动“听”到指令 ——
+      micBtn.addEventListener("click", () => {
+        if (micBtn.classList.contains("listening")) return;
+        micBtn.classList.add("listening");
+        statusEl.textContent = "正在聆听…（演示识别）";
+        statusEl.classList.add("listening");
+        input.value = "";
 
-      setTimeout(() => {
-        micBtn.classList.remove("listening");
-        statusEl.classList.remove("listening");
-        statusEl.textContent = "识别完成";
-        input.value = "帮我打开bilibili";
-        setTimeout(() => runCommand(input.value), 700);
-      }, 1200);
-    });
+        setTimeout(() => {
+          micBtn.classList.remove("listening");
+          statusEl.classList.remove("listening");
+          statusEl.textContent = "识别完成";
+          input.value = "帮我打开bilibili";
+          setTimeout(() => runCommand(input.value), 2500);
+        }, 1200);
+      });
 
-    sendBtn.addEventListener("click", () => runCommand(input.value));
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") runCommand(input.value);
-    });
-  </script>
-</body>
+      sendBtn.addEventListener("click", () => runCommand(input.value));
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") runCommand(input.value);
+      });
+    </script>
+  </body>
 </html>
