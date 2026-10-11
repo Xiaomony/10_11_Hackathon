@@ -12,6 +12,7 @@ const DEFAULT_STATE = {
     imageDescribe: false,
     textReader: false,
     crosshair: false,
+    readingGuide: false,
     colorBlindMode: "off",
   },
   readingRate: 0.9,
@@ -421,6 +422,76 @@ const TextReader = {
   },
 };
 
+// 阅读辅助线：跟随鼠标的聚焦遮罩，上下暗化、中间留出清晰阅读窗口，帮助专注当前行
+const ReadingGuide = {
+  elements: [],
+  enabled: false,
+  windowHeight: 90, // 中间清晰窗口的高度（px）
+
+  create() {
+    if (this.elements.length > 0) return;
+    this.enabled = true;
+
+    const maskStyle = `
+      position: fixed;
+      left: 0;
+      width: 100vw;
+      background: rgba(0, 0, 0, 0.45);
+      z-index: 2147483646;
+      pointer-events: none;
+    `;
+    const lineStyle = `
+      position: fixed;
+      left: 0;
+      width: 100vw;
+      height: 2px;
+      background: #ffd54f;
+      box-shadow: 0 0 4px rgba(255, 213, 79, 0.8);
+      z-index: 2147483646;
+      pointer-events: none;
+    `;
+
+    const topMask = document.createElement("div");
+    topMask.style.cssText = maskStyle + "top: 0; height: 0;";
+    const bottomMask = document.createElement("div");
+    bottomMask.style.cssText = maskStyle + "top: 0; height: 0;";
+    const topLine = document.createElement("div");
+    topLine.style.cssText = lineStyle;
+    const bottomLine = document.createElement("div");
+    bottomLine.style.cssText = lineStyle;
+
+    this.elements = [topMask, bottomMask, topLine, bottomLine];
+    this.elements.forEach((el) => document.body.appendChild(el));
+
+    this.moveHandler = (e) => this.update(e.clientY);
+    document.addEventListener("mousemove", this.moveHandler);
+  },
+
+  update(y) {
+    if (this.elements.length < 4) return;
+    const half = this.windowHeight / 2;
+    const top = Math.max(0, y - half);
+    const bottom = y + half;
+    const vh = window.innerHeight;
+
+    this.elements[0].style.height = `${top}px`; // 上遮罩
+    this.elements[1].style.top = `${bottom}px`; // 下遮罩
+    this.elements[1].style.height = `${Math.max(0, vh - bottom)}px`;
+    this.elements[2].style.top = `${top}px`; // 窗口上沿参考线
+    this.elements[3].style.top = `${bottom}px`; // 窗口下沿参考线
+  },
+
+  destroy() {
+    this.elements.forEach((el) => el.remove());
+    this.elements = [];
+    this.enabled = false;
+    if (this.moveHandler) {
+      document.removeEventListener("mousemove", this.moveHandler);
+      this.moveHandler = null;
+    }
+  },
+};
+
 const Crosshair = {
   elements: [],
 
@@ -552,6 +623,12 @@ function applyFeatures(features) {
     Crosshair.destroy();
   }
 
+  if (features.readingGuide) {
+    ReadingGuide.create();
+  } else {
+    ReadingGuide.destroy();
+  }
+
   ColorBlindness.apply(features.colorBlindMode);
 }
 
@@ -566,6 +643,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         msg.enabled ? TextReader.enable() : TextReader.disable();
       } else if (msg.feature === "crosshair") {
         msg.enabled ? Crosshair.create() : Crosshair.destroy();
+      } else if (msg.feature === "readingGuide") {
+        msg.enabled ? ReadingGuide.create() : ReadingGuide.destroy();
       }
       break;
 

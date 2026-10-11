@@ -5,6 +5,7 @@ const DEFAULT_STATE = {
     imageDescribe: false,
     textReader: false,
     crosshair: false,
+    readingGuide: false,
     colorBlindMode: "off",
   },
   apiKey: "",
@@ -205,6 +206,15 @@ chrome.commands.onCommand.addListener(async (command) => {
       await chrome.tabs.sendMessage(tab.id, {
         type: "TOGGLE_FEATURE",
         feature: "textReader",
+        enabled: newValue,
+      });
+    } else if (command === "toggle-reading-guide") {
+      const newValue = !state.features.readingGuide;
+      state.features.readingGuide = newValue;
+      await saveState(state);
+      await chrome.tabs.sendMessage(tab.id, {
+        type: "TOGGLE_FEATURE",
+        feature: "readingGuide",
         enabled: newValue,
       });
     } else if (command === "cycle-colorblind") {

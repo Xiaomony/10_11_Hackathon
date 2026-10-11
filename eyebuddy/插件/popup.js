@@ -5,6 +5,7 @@ const DEFAULT_STATE = {
     imageDescribe: false,
     textReader: false,
     crosshair: false,
+    readingGuide: false,
     colorBlindMode: "off",
   },
   apiKey: "",
@@ -90,6 +91,12 @@ function updateUI(state) {
   $("crosshair-status").textContent = features.crosshair ? "已开启" : "未开启";
   $("crosshair-status").classList.toggle("active", features.crosshair);
 
+  $("toggle-reading-guide").checked = features.readingGuide;
+  $("reading-guide-status").textContent = features.readingGuide
+    ? "已开启"
+    : "未开启";
+  $("reading-guide-status").classList.toggle("active", features.readingGuide);
+
   const cbEnabled = features.colorBlindMode !== "off";
   $("toggle-cb").checked = cbEnabled;
   $("cb-status").textContent = cbEnabled
@@ -167,6 +174,10 @@ function bindToggles() {
 
   $("toggle-crosshair").addEventListener("change", (e) => {
     toggleFeature("crosshair", e.target.checked);
+  });
+
+  $("toggle-reading-guide").addEventListener("change", (e) => {
+    toggleFeature("readingGuide", e.target.checked);
   });
 
   $("toggle-cb").addEventListener("change", (e) => {

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "瞳伴 EyeBuddy",
-  "version": "1.1.0",
-  "description": "看不见图、找不到鼠标、分不清颜色、看不清文字？一个插件，五种功能，一站解决。",
+  "version": "1.2.0",
+  "description": "看不见图、找不到鼠标、分不清颜色、看不清文字？一个插件，六种功能，一站解决。",
   "permissions": ["storage", "activeTab", "tabs"],
   "host_permissions": ["<all_urls>"],
   "icons": {
@@ -40,6 +40,9 @@
     "toggle-reader": {
       "suggested_key": { "default": "Ctrl+Shift+R" },
       "description": "开关文字朗读"
+    },
+    "toggle-reading-guide": {
+      "description": "开关阅读辅助线"
     },
     "cycle-colorblind": {
       "suggested_key": { "default": "Ctrl+Shift+C" },
