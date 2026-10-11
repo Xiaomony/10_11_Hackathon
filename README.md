@@ -6,26 +6,34 @@
 
 ## 🖱️ 怎么打开演示页面（选一种）
 
-### 方式一：本地打开（推荐，最稳）
+### 方式一：在线网址（点开即用）
 
-仓库已经下载到电脑上的话，用**文件资源管理器**进入仓库文件夹，**双击**对应的 `.html` 文件即可（会用默认浏览器打开），或把文件**拖进 Chrome 窗口**。
+仓库开启 GitHub Pages 后，所有演示页都有固定网址（由仓库主人 Settings → Pages 开启，见下方说明）：
+
+| 页面                     | 网址                                                                |
+| ------------------------ | ------------------------------------------------------------------- |
+| 路演演示页               | https://xiaomony.github.io/10_13_Hackathon/eyebuddy/demo-page.html  |
+| 功能测试页               | https://xiaomony.github.io/10_13_Hackathon/eyebuddy/test-page.html  |
+| 语音助手演示（bilibili） | https://xiaomony.github.io/10_13_Hackathon/eyebuddy/voice-demo.html |
+
+> **网址打不开？** 需要仓库所有者（Xiaomony）开启一次：仓库页面 → **Settings → Pages** → Build and deployment 下 Source 选 **Deploy from a branch** → Branch 选 **main**、目录 **/(root)** → **Save**。约 1~2 分钟后上面的网址即可访问。
+
+### 方式二：本地打开（断网也能用）
+
+用**文件资源管理器**进入仓库文件夹，**双击**对应的 `.html` 文件即可（会用默认浏览器打开），或把文件**拖进 Chrome 窗口**。
 
 > 仓库位置（本机）：`C:\Users\James Yip\Documents\trae_projects\heikesong\10_13_Hackathon`
-
-### 方式二：在线打开
-
-如果仓库开启了 GitHub Pages，直接点下面的"在线打开"链接即可。
 
 ---
 
 ## 📄 演示页面一览
 
-| 页面 | 用途 | 本地打开 | 在线打开 |
-|---|---|---|---|
-| 路演演示页 | 主舞台：三张图按演示顺序排好，配合插件完整走流程 | `eyebuddy\demo-page.html` 双击 | [demo-page.html](eyebuddy/demo-page.html) |
-| 功能测试页 | 4 个用例逐一验证插件各分支 | `eyebuddy\test-page.html` 双击 | [test-page.html](eyebuddy/test-page.html) |
-| 语音助手演示 | 输入/点麦克风"帮我打开bilibili"→ 真的打开 bilibili（仅演示） | `eyebuddy\voice-demo.html` 双击 | [voice-demo.html](eyebuddy/voice-demo.html) |
-| 2 分钟逐字稿 | 台词、检查清单、翻车预案 | `eyebuddy\demo-script.md` | [demo-script.md](eyebuddy/demo-script.md) |
+| 页面         | 用途                                                         | 本地文件                        | 在线网址                                                                                 |
+| ------------ | ------------------------------------------------------------ | ------------------------------- | ---------------------------------------------------------------------------------------- |
+| 路演演示页   | 主舞台：三张图按演示顺序排好，配合插件完整走流程             | `eyebuddy\demo-page.html` 双击  | [demo-page 在线版](https://xiaomony.github.io/10_13_Hackathon/eyebuddy/demo-page.html)   |
+| 功能测试页   | 4 个用例逐一验证插件各分支                                   | `eyebuddy\test-page.html` 双击  | [test-page 在线版](https://xiaomony.github.io/10_13_Hackathon/eyebuddy/test-page.html)   |
+| 语音助手演示 | 输入/点麦克风"帮我打开bilibili"→ 真的打开 bilibili（仅演示） | `eyebuddy\voice-demo.html` 双击 | [voice-demo 在线版](https://xiaomony.github.io/10_13_Hackathon/eyebuddy/voice-demo.html) |
+| 2 分钟逐字稿 | 台词、检查清单、翻车预案                                     | `eyebuddy\demo-script.md`       | [demo-script.md](eyebuddy/demo-script.md)                                                |
 
 > 注意：`demo-page.html` 和 `test-page.html` 需要**先装好插件**才能看到完整效果（见下文）；`voice-demo.html` 单独打开就能玩。
 
