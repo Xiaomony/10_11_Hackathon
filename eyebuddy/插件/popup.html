@@ -32,11 +32,19 @@
         margin-bottom: 10px;
       }
       .voice-msg.ai {
-        color: #7df9ff;
+        color: #0097a7;
       }
       .voice-msg.user {
-        color: #e8eef5;
+        color: #1a1a1a;
         font-weight: 600;
+      }
+      @media (prefers-color-scheme: dark) {
+        .voice-msg.ai {
+          color: #7df9ff;
+        }
+        .voice-msg.user {
+          color: #e8eef5;
+        }
       }
       .voice-msg.hidden {
         display: none;
@@ -398,29 +406,6 @@
         <span class="shortcut-hint">说一句话，帮你打开网站</span>
       </div>
 
-      <div id="voice-panel" class="hidden">
-        <button id="voice-back" class="btn-text">← 返回功能面板</button>
-        <div class="voice-chat">
-          <div class="voice-msg ai" id="voice-hint">
-            你好，我是瞳伴语音助手。点击麦克风，或直接输入指令。
-          </div>
-          <div class="voice-msg user hidden" id="voice-user"></div>
-          <div class="voice-msg ai hidden" id="voice-ai"></div>
-        </div>
-        <div class="voice-input-row">
-          <input
-            type="text"
-            id="voice-input"
-            placeholder="例如：帮我打开bilibili"
-            aria-label="语音指令输入框"
-            autocomplete="off"
-          />
-          <button id="voice-mic" title="语音识别（演示）">🎙️</button>
-          <button id="voice-send">发送</button>
-        </div>
-        <div id="voice-status">随便说什么，我都会帮你打开 bilibili</div>
-      </div>
-
       <footer class="panel-footer">
         <button id="show-onboarding" class="btn-text">重新引导</button>
         <button id="help-btn" class="btn-text">帮助</button>
@@ -443,6 +428,29 @@
         </div>
       </footer>
     </section>
+
+    <div id="voice-panel" class="hidden">
+      <button id="voice-back" class="btn-text">← 返回功能面板</button>
+      <div class="voice-chat">
+        <div class="voice-msg ai" id="voice-hint">
+          你好，我是瞳伴语音助手。点击麦克风，或直接输入指令。
+        </div>
+        <div class="voice-msg user hidden" id="voice-user"></div>
+        <div class="voice-msg ai hidden" id="voice-ai"></div>
+      </div>
+      <div class="voice-input-row">
+        <input
+          type="text"
+          id="voice-input"
+          placeholder="例如：帮我打开bilibili"
+          aria-label="语音指令输入框"
+          autocomplete="off"
+        />
+        <button id="voice-mic" title="语音识别（演示）">🎙️</button>
+        <button id="voice-send">发送</button>
+      </div>
+      <div id="voice-status">随便说什么，我都会帮你打开 bilibili</div>
+    </div>
 
     <script src="popup.js"></script>
   </body>
