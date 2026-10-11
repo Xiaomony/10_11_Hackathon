@@ -46,8 +46,7 @@
       "description": "循环切换色盲校正模式"
     },
     "danmaku-summary": {
-      "suggested_key": { "default": "Ctrl+Shift+D" },
-      "description": "B站弹幕AI总结"
+      "description": "B站弹幕AI总结（可在扩展快捷键页手动绑定）"
     }
   }
 }

@@ -191,15 +191,25 @@ function formatDanmakuTime(sec) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function decodeXmlEntities(s) {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 function parseDanmakuXML(xmlText) {
-  const doc = new DOMParser().parseFromString(xmlText, "text/xml");
   const items = [];
-  for (const d of doc.querySelectorAll("d")) {
-    const p = (d.getAttribute("p") || "").split(",");
+  const re = /<d\s+p="([^"]*)"[^>]*>([\s\S]*?)<\/d>/g;
+  let m;
+  while ((m = re.exec(xmlText)) !== null) {
+    const p = m[1].split(",");
     if (p.length < 8) continue;
     const type = parseInt(p[1]);
     if (![1, 2, 3].includes(type)) continue;
-    const content = (d.textContent || "").trim();
+    const content = decodeXmlEntities(m[2]).trim();
     if (!content) continue;
     items.push({
       time: parseFloat(p[0]),
@@ -211,14 +221,30 @@ function parseDanmakuXML(xmlText) {
 }
 
 async function fetchDanmaku(cid) {
-  const response = await fetch(`${DANMAKU_API_URL}?oid=${cid}`, {
-    headers: { Referer: "https://www.bilibili.com" },
-  });
-  if (!response.ok) {
-    throw new Error(`弹幕接口 ${response.status}`);
+  const urls = [
+    `${DANMAKU_API_URL}?oid=${cid}`,
+    `https://comment.bilibili.com/${cid}.xml`,
+  ];
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        headers: { Referer: "https://www.bilibili.com" },
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const xmlText = await response.text();
+      if (!xmlText.includes("<d ")) {
+        throw new Error("响应不是有效弹幕XML");
+      }
+      return parseDanmakuXML(xmlText);
+    } catch (e) {
+      console.error(`瞳伴弹幕接口失败(${url}):`, e.message);
+      lastError = e;
+    }
   }
-  const xmlText = await response.text();
-  return parseDanmakuXML(xmlText);
+  throw lastError || new Error("弹幕接口全部失败");
 }
 
 async function summarizeDanmaku(items, apiKey) {
@@ -250,18 +276,43 @@ ${lines}
   });
 
   if (!response.ok) {
-    throw new Error(await buildApiError(response));
+    const errText = await response.text();
+    throw new Error(`API ${response.status}: ${errText}`);
   }
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || "无法生成总结";
 }
 
-async function handleDanmakuSummary(cid) {
+async function resolveCid(bvid, page) {
+  const resp = await fetch(
+    `https://api.bilibili.com/x/player/pagelist?bvid=${bvid}&jsonp=jsonp`,
+    { headers: { Referer: "https://www.bilibili.com" } },
+  );
+  if (!resp.ok) throw new Error(`pagelist ${resp.status}`);
+  const data = await resp.json();
+  const pages = data?.data || [];
+  if (pages.length === 0) return null;
+  const idx = Math.min(Math.max((page || 1) - 1, 0), pages.length - 1);
+  return pages[idx]?.cid || null;
+}
+
+async function handleDanmakuSummary(cid, bvid, page) {
   const state = await getState();
 
   if (!state.apiKey && !state.demoMode) {
     return { error: "请先在插件设置中配置 API Key" };
+  }
+
+  if (!cid && bvid) {
+    try {
+      cid = await resolveCid(bvid, page);
+    } catch (e) {
+      console.error("瞳伴cid解析错误:", e.message);
+    }
+  }
+  if (!cid) {
+    return { error: "无法获取视频弹幕ID" };
   }
 
   let items;
@@ -354,7 +405,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.type === "FETCH_DANMAKU") {
-    handleDanmakuSummary(msg.cid).then(sendResponse);
+    handleDanmakuSummary(msg.cid, msg.bvid, msg.page).then(sendResponse);
     return true;
   }
 });
