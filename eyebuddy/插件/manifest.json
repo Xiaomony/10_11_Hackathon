@@ -53,6 +53,9 @@
     "cycle-colorblind": {
       "suggested_key": { "default": "Ctrl+Shift+C" },
       "description": "循环切换色盲校正模式"
+    },
+    "danmaku-summary": {
+      "description": "B站弹幕AI总结"
     }
   }
 }

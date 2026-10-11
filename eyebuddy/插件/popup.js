@@ -9,6 +9,7 @@ const DEFAULT_STATE = {
     typography: false,
     bigCursor: false,
     colorBlindMode: "off",
+    danmakuSummary: false,
   },
   apiKey: "",
   demoMode: false,
@@ -84,6 +85,10 @@ function updateUI(state) {
     ? "已开启"
     : "未开启";
   $("imgdesc-status").classList.toggle("active", features.imageDescribe);
+
+  $("toggle-danmaku").checked = !!features.danmakuSummary;
+  $("dm-status").textContent = features.danmakuSummary ? "已开启" : "未开启";
+  $("dm-status").classList.toggle("active", !!features.danmakuSummary);
 
   $("toggle-tts").checked = features.textReader;
   $("tts-status").textContent = features.textReader ? "已开启" : "未开启";
@@ -179,6 +184,10 @@ function bindToggles() {
 
   $("toggle-imgdesc").addEventListener("change", (e) => {
     toggleFeature("imageDescribe", e.target.checked);
+  });
+
+  $("toggle-danmaku").addEventListener("change", (e) => {
+    toggleFeature("danmakuSummary", e.target.checked);
   });
 
   $("toggle-tts").addEventListener("change", (e) => {
