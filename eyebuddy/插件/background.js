@@ -13,7 +13,33 @@ const DEFAULT_STATE = {
 
 const QWEN_API_URL =
   "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-const QWEN_MODEL = "qwen-vl-plus";
+const QWEN_MODEL = "qwen-vl-plus"; // 视觉模型：截图/图片描述
+const QWEN_TEXT_MODEL = "qwen-plus"; // 文本模型：无障碍树解析（后续 Agent 对话也复用）
+
+/**
+ * DashScope OpenAI 兼容接口的统一调用入口。
+ * messages 为标准 chat 消息数组，后续 AI Agent 的多轮对话直接复用本函数。
+ */
+async function dashscopeChat(messages, apiKey, model = QWEN_TEXT_MODEL) {
+  const response = await fetch(QWEN_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model, messages }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`API ${response.status}: ${errText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error("模型返回为空");
+  return typeof content === "string" ? content : JSON.stringify(content);
+}
 
 async function getState() {
   const result = await chrome.storage.local.get("eyebuddyState");
@@ -46,42 +72,65 @@ async function callQwenVL(imageBase64, apiKey, colorBlindMode, customPrompt) {
       : `用户当前处于${modeNames[colorBlindMode]}色盲校正模式。请用中文描述这个网页画面的内容，包括页面布局、图片、文字区域、按钮等可见元素，并在描述中标注关键元素的颜色（如"红色按钮""绿色链接""蓝色标题"），不超过120字。`;
   }
 
-  const response = await fetch(QWEN_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: QWEN_MODEL,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: imageBase64 } },
-          ],
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`API ${response.status}: ${errText}`);
-  }
-
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || "无法生成描述";
+  return dashscopeChat(
+    [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: imageBase64 } },
+        ],
+      },
+    ],
+    apiKey,
+    QWEN_MODEL,
+  );
 }
 
-async function handleDescribePage() {
+/**
+ * 文本模式：把无障碍树发给 qwen-plus 生成页面概述。
+ * 比截图视觉模型更快、更省 token，且元素编号可被后续 Agent 引用。
+ */
+async function callQwenText({ title, url, tree, elementCount }, apiKey) {
+  const prompt =
+    `你是一名面向视障用户的网页阅读助手。以下是网页《${title || "(无标题)"}》（${url}）的无障碍树，` +
+    "它是页面可见元素的精简结构：每行格式为「[编号] 角色: 名称」，缩进表示包含关系；" +
+    "常见角色有 heading(标题)、link(链接)、button(按钮)、textbox(输入框)、img(图片)、video(视频)，" +
+    "以及 navigation/main/banner 等页面分区；共约 " +
+    (elementCount || 0) +
+    " 个元素。\n" +
+    "请用中文向视障用户概述：1)这是什么页面；2)主要分区与布局；3)重点内容和可以进行的操作。" +
+    "控制在150字以内，直接输出描述本身，不要分点、不要标题。\n\n" +
+    tree;
+
+  return dashscopeChat(
+    [{ role: "user", content: prompt }],
+    apiKey,
+    QWEN_TEXT_MODEL,
+  );
+}
+
+async function handleDescribePage(msg = {}) {
   const state = await getState();
 
   if (!state.apiKey) {
     return { error: "请先在插件设置中配置 API Key" };
   }
 
+  const colorBlindOn =
+    state.features.colorBlindMode && state.features.colorBlindMode !== "off";
+
+  // 优先：无障碍树 + 文本模型（色盲模式需要标注颜色，仍走视觉模型）
+  if (msg.mode === "a11y" && msg.tree && !colorBlindOn) {
+    try {
+      const description = await callQwenText(msg, state.apiKey);
+      return { description, mode: "a11y" };
+    } catch (e) {
+      console.warn("无障碍树解析失败，回退截图模式：", e.message);
+    }
+  }
+
+  // 兜底：可视区域截图 + 视觉模型
   try {
     const dataUrl = await chrome.tabs.captureVisibleTab(null, {
       format: "png",
@@ -91,10 +140,10 @@ async function handleDescribePage() {
       state.apiKey,
       state.features.colorBlindMode,
     );
-    return { description };
+    return { description, mode: "screenshot" };
   } catch (e) {
     console.error("瞳伴 API 错误:", e.message);
-    return { error: "截图或 API 调用失败，请检查 Key 和网络" };
+    return { error: "页面解析失败，请检查 Key 和网络" };
   }
 }
 
@@ -164,7 +213,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "DESCRIBE_PAGE") {
-    handleDescribePage().then(sendResponse);
+    handleDescribePage(msg).then(sendResponse);
     return true;
   }
   if (msg.type === "CAPTURE_SCREEN") {

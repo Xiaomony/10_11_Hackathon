@@ -17,9 +17,413 @@ const CB_MATRICES = {
 };
 
 async function getState() {
-  const result = await chrome.storage.local.get("eyebuddyState");
+  const result = await chrome.storage.local.get('eyebuddyState');
   return result.eyebuddyState || DEFAULT_STATE;
 }
+
+/**
+ * A11yTree：把渲染后的 DOM 压缩成"无障碍树"文本。
+ * - 只保留可见、有语义的元素（标题/链接/按钮/输入框/图片/媒体/页面分区/正文）
+ * - 每个入树元素分配数字 ref，并登记到 registry —— 供后续 AI Agent 按编号操作页面
+ * - 输出面向大模型的精简文本（缩进表示层级），带字符预算，避免超 token
+ */
+const A11yTree = {
+  registry: new Map(),
+  version: 0,
+  MAX_CHARS: 12000,
+  MAX_DEPTH: 24,
+
+  /**
+   * 抓取当前页面快照：{ version, text, count, truncated }
+   * walk 只负责收集有序条目，渲染时才按阅读顺序分配 ref，
+   * 保证编号从上到下单调递增，便于 AI 与后续 Agent 引用。
+   */
+  capture() {
+    this.registry.clear();
+    this.version += 1;
+
+    const entries = [];
+    this.walk(document.body, 0, entries);
+
+    const lines = [];
+    let refSeq = 0;
+    let chars = 0;
+    let truncated = false;
+
+    for (const item of entries) {
+      let line;
+      if (item.el) {
+        const ref = ++refSeq;
+        this.registry.set(ref, item.el);
+        line = `${'  '.repeat(item.depth)}[${ref}] ${item.label}`;
+        if (item.extra) line += ` ${item.extra}`;
+        if (item.name) line += `: ${this.truncate(item.name, 120)}`;
+      } else {
+        line = `${'  '.repeat(item.depth)}${this.truncate(item.text, 200)}`;
+      }
+
+      chars += line.length;
+      if (chars > this.MAX_CHARS) {
+        truncated = true;
+        break;
+      }
+      lines.push(line);
+    }
+
+    let text =
+      `页面标题: ${document.title || '(无标题)'}\n` +
+      `URL: ${location.href}\n` +
+      `页面结构（[编号]用于引用元素，缩进表示层级）:\n` +
+      lines.join('\n');
+
+    if (truncated) {
+      text += '\n...(页面过长，仅展示前半部分)';
+    }
+
+    return {
+      version: this.version,
+      text,
+      count: refSeq,
+      truncated
+    };
+  },
+
+  getElement(ref) {
+    return this.registry.get(Number(ref)) || null;
+  },
+
+  // ---------- 内部实现 ----------
+
+  SKIP_TAGS: new Set([
+    'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'LINK', 'META',
+    'HEAD', 'TITLE', 'BR', 'HR', 'SVG', 'PATH', 'OPTGROUP'
+  ]),
+
+  // 叶子角色：名称已聚合内部文本，不再向下展开，避免重复
+  LEAF_ROLES: new Set([
+    'button', 'link', 'heading', 'img', 'textbox', 'checkbox', 'radio',
+    'switch', 'tab', 'menuitem', 'option', 'slider', 'combobox',
+    'video', 'audio', 'canvas'
+  ]),
+
+  ARIA_ROLES: new Set([
+    'button', 'link', 'textbox', 'checkbox', 'radio', 'combobox',
+    'listbox', 'option', 'heading', 'list', 'listitem', 'img',
+    'navigation', 'main', 'banner', 'contentinfo', 'complementary',
+    'region', 'tab', 'tablist', 'menuitem', 'menu', 'slider',
+    'switch', 'search', 'dialog', 'toolbar', 'table', 'row', 'cell',
+    'columnheader', 'rowheader', 'group', 'article', 'form', 'alert'
+  ]),
+
+  isVisible(el) {
+    if (el.hidden || el.getAttribute('aria-hidden') === 'true') return false;
+    if (typeof el.checkVisibility === 'function') {
+      try {
+        return el.checkVisibility();
+      } catch (e) { /* 回退到几何判断 */ }
+    }
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return false;
+    const style = getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  },
+
+  isOwnUI(el) {
+    return typeof el.closest === 'function' &&
+      Boolean(el.closest(`[class^="${PREFIX}-"]`));
+  },
+
+  cleanText(s) {
+    return (s || '').replace(/\s+/g, ' ').trim();
+  },
+
+  truncate(s, n) {
+    return s.length > n ? s.slice(0, n) + '…' : s;
+  },
+
+  /** 计算元素的无障碍名称 */
+  accessibleName(el) {
+    const labelledby = el.getAttribute && el.getAttribute('aria-labelledby');
+    if (labelledby) {
+      const parts = labelledby.split(/\s+/).map((id) => {
+        const node = document.getElementById(id);
+        return node ? this.cleanText(node.innerText) : '';
+      }).filter(Boolean);
+      if (parts.length) return this.truncate(parts.join(' '), 120);
+    }
+
+    const ariaLabel = el.getAttribute && el.getAttribute('aria-label');
+    if (ariaLabel) return this.truncate(this.cleanText(ariaLabel), 120);
+
+    const tag = el.tagName;
+    if (tag === 'IMG') return this.truncate(this.cleanText(el.alt || el.title), 120);
+    if (tag === 'AREA') return this.truncate(this.cleanText(el.alt), 120);
+    if (tag === 'INPUT') {
+      // placeholder 已作为"提示"单独展示，这里只取关联 label / title，避免重复
+      const labelText = el.labels && el.labels[0] ? el.labels[0].innerText : '';
+      return this.truncate(this.cleanText(labelText || el.title), 120);
+    }
+    if (tag === 'SELECT') {
+      const selected = el.selectedOptions && el.selectedOptions[0];
+      return this.truncate(this.cleanText(
+        selected ? selected.textContent : el.value
+      ), 120);
+    }
+    if (tag === 'VIDEO' || tag === 'AUDIO') {
+      return this.truncate(this.cleanText(el.title), 120);
+    }
+    return this.truncate(this.cleanText(el.innerText || el.textContent), 120);
+  },
+
+  /** 由标签/ARIA 推断语义角色，返回 { role, level } 或 null */
+  resolveRole(el) {
+    const ariaRole = el.getAttribute && el.getAttribute('role');
+    if (ariaRole) {
+      const role = ariaRole.split(/\s+/)[0];
+      if (this.ARIA_ROLES.has(role)) {
+        const level = el.getAttribute('aria-level');
+        return { role, level: level ? Number(level) : null };
+      }
+    }
+
+    switch (el.tagName) {
+      case 'A': return { role: 'link' };
+      case 'BUTTON':
+      case 'SUMMARY':
+        return { role: 'button' };
+      case 'H1': return { role: 'heading', level: 1 };
+      case 'H2': return { role: 'heading', level: 2 };
+      case 'H3': return { role: 'heading', level: 3 };
+      case 'H4': return { role: 'heading', level: 4 };
+      case 'H5': return { role: 'heading', level: 5 };
+      case 'H6': return { role: 'heading', level: 6 };
+      case 'NAV': return { role: 'navigation' };
+      case 'MAIN': return { role: 'main' };
+      case 'HEADER': return { role: 'banner' };
+      case 'FOOTER': return { role: 'contentinfo' };
+      case 'ASIDE': return { role: 'complementary' };
+      case 'ARTICLE': return { role: 'article' };
+      case 'FORM':
+        return el.getAttribute('aria-label') || el.getAttribute('aria-labelledby')
+          ? { role: 'form' } : null;
+      case 'SECTION':
+        return el.getAttribute('aria-label') || el.getAttribute('aria-labelledby')
+          ? { role: 'region' } : null;
+      case 'UL':
+      case 'OL':
+        return { role: 'list' };
+      case 'LI': return { role: 'listitem' };
+      case 'IMG': return { role: 'img' };
+      case 'CANVAS': return { role: 'canvas' };
+      case 'VIDEO': return { role: 'video' };
+      case 'AUDIO': return { role: 'audio' };
+      case 'TABLE': return { role: 'table' };
+      case 'TR': return { role: 'row' };
+      case 'TH': return { role: 'columnheader' };
+      case 'TD': return { role: 'cell' };
+      case 'SELECT': return { role: 'combobox' };
+      case 'TEXTAREA': return { role: 'textbox' };
+      case 'INPUT': {
+        const t = (el.type || 'text').toLowerCase();
+        if (['hidden', 'reset'].includes(t)) return null;
+        if (t === 'checkbox') return { role: 'checkbox' };
+        if (t === 'radio') return { role: 'radio' };
+        if (['submit', 'button', 'image'].includes(t)) return { role: 'button' };
+        if (t === 'range') return { role: 'slider' };
+        return { role: 'textbox', inputType: t };
+      }
+      default:
+        // 带 tabindex 的可交互元素（组件库常把 div 做成按钮）
+        if (el.tabIndex >= 0) return { role: 'button', guessed: true };
+        return null;
+    }
+  },
+
+  /** 节点直接包含的文本（不含子元素） */
+  ownDirectText(el) {
+    let t = '';
+    for (const node of el.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) t += node.textContent;
+    }
+    return this.cleanText(t);
+  },
+
+  /** 收集一个元素条目（ref 在最终渲染时才统一分配） */
+  pushEntry(sink, depth, label, el, name, extra) {
+    sink.push({ el, depth, label, name: name || '', extra: extra || '' });
+  },
+
+  /** 收集一个纯文本条目 */
+  pushText(sink, depth, text) {
+    if (text.length < 2) return;
+    sink.push({ depth, text });
+  },
+
+  buildExtra(role, el, roleInfo) {
+    const flags = [];
+    if (role === 'checkbox' || role === 'radio' || role === 'switch') {
+      flags.push(el.checked ? '[已选中]' : '[未选中]');
+    }
+    if (el.disabled || el.getAttribute('aria-disabled') === 'true') {
+      flags.push('[禁用]');
+    }
+    if (el.getAttribute('aria-expanded') === 'true') flags.push('[已展开]');
+    if (el.getAttribute('aria-expanded') === 'false') flags.push('[已折叠]');
+    if (role === 'textbox' && el.placeholder) {
+      flags.push(`提示="${this.truncate(this.cleanText(el.placeholder), 40)}"`);
+    }
+    if (role === 'link' && el.href) {
+      try {
+        const u = new URL(el.href);
+        flags.push('-> ' + (u.pathname === '/' ? '/' : u.pathname + u.search).slice(0, 80));
+      } catch (e) { /* 忽略异常 URL */ }
+    }
+    if (roleInfo && roleInfo.guessed) flags.push('[可点击]');
+    return flags.join(' ');
+  },
+
+  /**
+   * 递归遍历，收集"父先于子"的先序条目到 sink；
+   * 返回该子树是否产出了内容。
+   */
+  walk(el, depth, sink) {
+    if (depth > this.MAX_DEPTH) return false;
+    if (el.nodeType !== Node.ELEMENT_NODE) return false;
+    if (this.SKIP_TAGS.has(el.tagName)) return false;
+    if (this.isOwnUI(el)) return false;
+    if (!this.isVisible(el)) return false;
+
+    // iframe / plugin：跨域无法进入，作为占位元素提示
+    if (el.tagName === 'IFRAME' || el.tagName === 'OBJECT') {
+      this.pushEntry(sink, depth, el.tagName === 'IFRAME' ? 'iframe' : 'plugin', el,
+        this.accessibleName(el), el.src ? `src="${el.src.slice(0, 80)}"` : '');
+      return true;
+    }
+
+    const roleInfo = this.resolveRole(el);
+    const role = roleInfo ? roleInfo.role : null;
+
+    // ---------- 叶子语义元素：名称聚合自身文本，不向下展开 ----------
+    if (role && this.LEAF_ROLES.has(role)) {
+      let name = this.accessibleName(el);
+
+      // 链接/按钮常嵌套图片图标：innerText 拿不到 img alt，这里补全
+      if (!name && (role === 'link' || role === 'button')) {
+        const parts = [];
+        el.querySelectorAll?.('img[alt], [aria-label]').forEach((n) => {
+          parts.push(n.getAttribute('alt') || n.getAttribute('aria-label') || '');
+        });
+        name = this.truncate(this.cleanText(parts.join(' ')), 120);
+      }
+
+      // 空标题是纯噪声，直接丢弃（空按钮/输入框等控件仍保留）
+      if (role === 'heading' && !name) return false;
+
+      const label = role === 'heading'
+        ? `heading(${roleInfo.level || 2})`
+        : role;
+      this.pushEntry(sink, depth, label, el,
+        name, this.buildExtra(role, el, roleInfo));
+      return true;
+    }
+
+    // 先递归收集子树（语义容器增加缩进，无语义包裹层不增加层级）
+    const childSink = [];
+    const childDepth = role ? depth + 1 : depth;
+    let hasChild = false;
+    for (const child of el.children) {
+      if (this.walk(child, childDepth, childSink)) hasChild = true;
+    }
+
+    // ---------- 无语义元素：包裹层透传，仅保留文本 ----------
+    if (!role) {
+      if (hasChild) {
+        const ownText = this.ownDirectText(el);
+        if (ownText.length >= 2) this.pushText(sink, depth, ownText);
+        sink.push(...childSink);
+        return true;
+      }
+      const fullText = this.cleanText(el.innerText || el.textContent);
+      if (fullText.length >= 2) {
+        this.pushText(sink, depth, fullText);
+        return true;
+      }
+      return false;
+    }
+
+    // ---------- 容器语义元素（nav/main/list/table 等） ----------
+    // 优先 aria 名称；没有子元素时才聚合自身文本，避免与子元素文本重复
+    const ariaName = this.cleanText(el.getAttribute('aria-label') || '');
+    if (!hasChild && !ariaName) return false;
+
+    const name = ariaName || (hasChild ? '' : this.accessibleName(el));
+    this.pushEntry(sink, depth, role, el,
+      name, this.buildExtra(role, el, roleInfo));
+    sink.push(...childSink);
+    return true;
+  }
+};
+
+/**
+ * AgentActions：AI 操作页面的执行层（第二个功能的预留接口）。
+ * ref 来自最近一次 A11yTree.capture() 的注册表；
+ * SPA 页面变化后旧 ref 会失效，Agent 每步执行前应重新 GET_SNAPSHOT。
+ */
+const AgentActions = {
+  async execute({ ref, action, value } = {}) {
+    const el = A11yTree.getElement(ref);
+    if (!el) {
+      return { ok: false, error: '元素编号已失效，请重新获取页面快照' };
+    }
+
+    try {
+      switch (action) {
+        case 'click':
+          el.scrollIntoView({ block: 'center', behavior: 'instant' });
+          el.click();
+          return { ok: true };
+
+        case 'focus':
+          el.scrollIntoView({ block: 'center', behavior: 'instant' });
+          el.focus();
+          return { ok: true };
+
+        case 'type': {
+          // 兼容 React/Vue：用原生 setter 赋值再派发 input/change
+          el.scrollIntoView({ block: 'center', behavior: 'instant' });
+          el.focus();
+          const text = String(value ?? '');
+          if (el.isContentEditable) {
+            el.textContent = text;
+          } else if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+            const proto = el.tagName === 'TEXTAREA'
+              ? HTMLTextAreaElement.prototype
+              : HTMLInputElement.prototype;
+            const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+            setter.call(el, text);
+          } else {
+            return { ok: false, error: '该元素不支持输入' };
+          }
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return { ok: true };
+        }
+
+        case 'scrollIntoView':
+          el.scrollIntoView({
+            block: 'center',
+            behavior: 'instant'
+          });
+          return { ok: true };
+
+        default:
+          return { ok: false, error: `不支持的操作: ${action}` };
+      }
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  }
+};
 
 const AIDescription = {
   panel: null,
@@ -34,8 +438,16 @@ const AIDescription = {
     this.showLoading();
 
     try {
+      // 优先走无障碍树文本解析（更快、更省 token）；
+      // background 侧会在色盲模式或文本解析失败时自动回退到截图视觉模型
+      const snapshot = A11yTree.capture();
       const response = await chrome.runtime.sendMessage({
         type: "DESCRIBE_PAGE",
+        mode: "a11y",
+        url: location.href,
+        title: document.title,
+        tree: snapshot.text,
+        elementCount: snapshot.count,
       });
 
       if (response && response.description) {
@@ -55,7 +467,7 @@ const AIDescription = {
     this.closePanel();
     const panel = document.createElement("div");
     panel.className = `${PREFIX}-ai-panel`;
-    panel.textContent = "🔍 正在分析页面画面...";
+    panel.textContent = "🔍 正在分析页面内容...";
     panel.style.cssText = `
       position: fixed;
       top: 50%;
@@ -550,6 +962,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "SCAN_NOW":
       AIDescription.describePage();
       break;
+
+    // ---- AI Agent 预留接口：每步操作前取快照，按 ref 执行动作 ----
+    case "GET_SNAPSHOT":
+      // 同步返回，无需 return true
+      sendResponse(A11yTree.capture());
+      break;
+
+    case "EXEC_ACTION":
+      AgentActions.execute(msg.action).then(sendResponse);
+      return true; // 异步响应
 
     case "SET_READING_RATE":
       TextReader.rate = msg.rate;
