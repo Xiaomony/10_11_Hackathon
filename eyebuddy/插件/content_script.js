@@ -1,4 +1,11 @@
 const PREFIX = "eyebuddy";
+// 演示模式通用描述池：悬停任意无描述图片时按顺序轮换
+const DEMO_DESCRIPTIONS = [
+  "这是一张风景照片，远处有连绵的山峦和一片湖泊，天空呈现日出时的金色。",
+  "这是一张人物肖像照片，背景虚化，看起来是新闻或博客文章的配图。",
+  "画面中是一个产品展示图，主体居中，下方有文字说明区域。",
+  "这是一张活动现场照片，能看到人群和舞台，可能拍摄于某次活动或聚会。",
+];
 const DEFAULT_STATE = {
   features: {
     aiDescription: false,
@@ -137,6 +144,7 @@ const ImageDescriber = {
   busy: false,
   lastEl: null,
   lastTime: 0,
+  demoIdx: 0,
 
   enable() {
     if (this.enabled) return;
@@ -197,6 +205,24 @@ const ImageDescriber = {
     this.busy = true;
 
     try {
+      const state = await getState();
+
+      // 演示模式：不调 API，模拟真实延迟后返回预置描述（现场无 API Key 时的兜底）
+      if (state.demoMode) {
+        AIDescription.showLoading();
+        await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1000));
+        const description =
+          el.dataset.demoDesc ||
+          DEMO_DESCRIPTIONS[this.demoIdx++ % DEMO_DESCRIPTIONS.length];
+        AIDescription.showPanel("🖼️ " + description);
+        if (TextReader.enabled) {
+          TextReader.speak(description);
+        }
+        this.lastEl = el;
+        this.lastTime = Date.now();
+        return;
+      }
+
       // 先截图再显示加载面板，避免面板被截进图里
       const cap = await chrome.runtime.sendMessage({ type: "CAPTURE_SCREEN" });
       if (!cap || cap.error || !cap.dataUrl)
@@ -531,12 +557,12 @@ function applyFeatures(features) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   switch (msg.type) {
-    case 'TOGGLE_FEATURE':
-      if (msg.feature === 'aiDescription') {
+    case "TOGGLE_FEATURE":
+      if (msg.feature === "aiDescription") {
         msg.enabled ? AIDescription.enable() : AIDescription.disable();
-      } else if (msg.feature === 'imageDescribe') {
+      } else if (msg.feature === "imageDescribe") {
         msg.enabled ? ImageDescriber.enable() : ImageDescriber.disable();
-      } else if (msg.feature === 'textReader') {
+      } else if (msg.feature === "textReader") {
         msg.enabled ? TextReader.enable() : TextReader.disable();
       } else if (msg.feature === "crosshair") {
         msg.enabled ? Crosshair.create() : Crosshair.destroy();

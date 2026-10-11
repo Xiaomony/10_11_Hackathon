@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>瞳伴 EyeBuddy · 路演演示页</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "Microsoft YaHei", sans-serif;
+      background: #070a10;
+      color: #e8eef5;
+      padding: 30px 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 34px; display: flex; align-items: center; gap: 14px; }
+    .sub { font-size: 18px; color: #8b9bb4; margin: 10px 0 8px; }
+    .question {
+      font-size: 26px;
+      color: #7df9ff;
+      margin: 26px 0 22px;
+      font-weight: 600;
+    }
+    .grid { display: flex; gap: 28px; flex-wrap: wrap; }
+    .card { flex: 1; min-width: 300px; }
+    .card img {
+      width: 100%;
+      border-radius: 14px;
+      display: block;
+      box-shadow: 0 8px 40px rgba(0, 229, 255, 0.15);
+    }
+    .card .note {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #5a6a82;
+      line-height: 1.6;
+    }
+    .card .tag {
+      display: inline-block;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 4px 14px;
+      border-radius: 14px;
+      margin-bottom: 10px;
+    }
+    .tag.green { background: rgba(80, 220, 120, 0.15); color: #7fe8a4; }
+    .tag.blue { background: rgba(0, 229, 255, 0.12); color: #7df9ff; }
+  </style>
+</head>
+<body>
+  <h1>👁️ 瞳伴 EyeBuddy</h1>
+  <p class="sub">给视障用户的浏览器眼睛 · 五种功能协同的无障碍插件</p>
+
+  <p class="question">当一张图片没有文字说明，视障用户怎么知道图里是什么？</p>
+
+  <div class="grid">
+    <div class="card">
+      <span class="tag green">镜头 1 · 有描述的图</span>
+      <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=a%20cute%20orange%20cat%20sitting%20on%20a%20windowsill%2C%20soft%20morning%20light%2C%20photorealistic&image_size=square_hd"
+           alt="一只橘猫坐在窗台上晒太阳">
+      <p class="note">网页写了 alt → 悬停即读，零成本</p>
+    </div>
+
+    <div class="card">
+      <span class="tag blue">镜头 2 · AI 主打：没有描述的图</span>
+      <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=mountain%20lake%20at%20sunrise%2C%20mist%20over%20calm%20water%2C%20golden%20peaks%2C%20photorealistic%20landscape&image_size=landscape_4_3"
+           data-demo-desc="这是一张日出时分的山间湖泊照片，湖面上漂浮着薄雾，远处的山峰被朝阳染成金色，整体氛围非常宁静。">
+      <p class="note">网页什么都没写 → 悬停，AI 看图说话</p>
+    </div>
+
+    <div class="card">
+      <span class="tag blue">镜头 2 备用 · 换一张也行</span>
+      <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=busy%20city%20street%20at%20night%20with%20colorful%20neon%20lights%2C%20people%20crossing%20the%20road%2C%20cinematic&image_size=landscape_4_3"
+           data-demo-desc="这是一张夜晚的城市街景，霓虹灯牌闪烁着彩色的光，行人们正在斑马线上过马路，看起来像一张新闻报道的配图。">
+      <p class="note">备选演示图（第一张效果不佳时换这张）</p>
+    </div>
+  </div>
+</body>
+</html>

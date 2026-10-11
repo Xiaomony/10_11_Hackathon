@@ -8,6 +8,7 @@ const DEFAULT_STATE = {
     colorBlindMode: "off",
   },
   apiKey: "",
+  demoMode: false,
   readingRate: 0.9,
 };
 
@@ -203,6 +204,12 @@ function bindSettings() {
     await sendToContentScript({ type: "SET_READING_RATE", rate });
   });
 
+  $("toggle-demo").addEventListener("change", async (e) => {
+    const state = await getState();
+    state.demoMode = e.target.checked;
+    await saveState(state);
+  });
+
   $("show-onboarding").addEventListener("click", async () => {
     const state = await getState();
     state.onboardingComplete = false;
@@ -218,6 +225,7 @@ function bindSettings() {
 async function init() {
   const state = await getState();
   $("api-key-input").value = state.apiKey || "";
+  $("toggle-demo").checked = !!state.demoMode;
   const rate = state.readingRate || 0.9;
   $("reading-rate-input").value = rate;
   $("reading-rate-value").textContent = rate.toFixed(1);

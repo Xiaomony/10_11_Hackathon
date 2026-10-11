@@ -8,6 +8,7 @@ const DEFAULT_STATE = {
     colorBlindMode: "off",
   },
   apiKey: "",
+  demoMode: false,
   readingRate: 0.9,
 };
 
@@ -77,6 +78,14 @@ async function callQwenVL(imageBase64, apiKey, colorBlindMode, customPrompt) {
 
 async function handleDescribePage() {
   const state = await getState();
+
+  // 演示模式：无需 API Key，返回预置的整页描述
+  if (state.demoMode) {
+    return {
+      description:
+        "这是一个资讯类网页：顶部是网站标题和导航栏，中间是文章正文，配有两张插图，底部有一排相关内容的链接。",
+    };
+  }
 
   if (!state.apiKey) {
     return { error: "请先在插件设置中配置 API Key" };
