@@ -13,6 +13,8 @@ const DEFAULT_STATE = {
     textReader: false,
     crosshair: false,
     readingGuide: false,
+    typography: false,
+    bigCursor: false,
     colorBlindMode: "off",
   },
   readingRate: 0.9,
@@ -492,6 +494,183 @@ const ReadingGuide = {
   },
 };
 
+// 文字排版增强：放大字号、加宽行距与字距，提升整页文字可读性（纯 CSS，不影响页面逻辑）
+const Typography = {
+  styleId: `${PREFIX}-typo-style`,
+  class: `${PREFIX}-typo`,
+
+  apply() {
+    document.documentElement.classList.add(this.class);
+    if (document.getElementById(this.styleId)) return;
+
+    const style = document.createElement("style");
+    style.id = this.styleId;
+    style.textContent = `
+      html.${this.class} { font-size: 112% !important; }
+      html.${this.class} p, html.${this.class} li, html.${this.class} td,
+      html.${this.class} dd, html.${this.class} blockquote,
+      html.${this.class} article, html.${this.class} section,
+      html.${this.class} h1, html.${this.class} h2, html.${this.class} h3,
+      html.${this.class} h4, html.${this.class} h5, html.${this.class} h6 {
+        line-height: 1.8 !important;
+        letter-spacing: 0.03em !important;
+        word-spacing: 0.08em !important;
+      }
+    `;
+    document.documentElement.appendChild(style);
+  },
+
+  remove() {
+    document.documentElement.classList.remove(this.class);
+    const style = document.getElementById(this.styleId);
+    if (style) style.remove();
+  },
+};
+
+// 大光标与点击反馈：放大鼠标指针 + 点击涟漪 + 轻微拖尾，解决"找不到鼠标"
+const BigCursor = {
+  styleId: `${PREFIX}-cursor-style`,
+  class: `${PREFIX}-bigcursor`,
+  active: false,
+  cursorUrl: null,
+  trailEls: [],
+  lastTrail: 0,
+
+  // 用 canvas 现画一个 48px 的大箭头（白填充 + 黑描边），任何背景上都醒目
+  buildCursor() {
+    if (this.cursorUrl) return this.cursorUrl;
+    const size = 48;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    ctx.beginPath();
+    ctx.moveTo(6, 2);
+    ctx.lineTo(6, 38);
+    ctx.lineTo(15, 29);
+    ctx.lineTo(22, 44);
+    ctx.lineTo(29, 41);
+    ctx.lineTo(22, 26);
+    ctx.lineTo(34, 26);
+    ctx.closePath();
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.fill();
+    ctx.stroke();
+    this.cursorUrl = canvas.toDataURL("image/png");
+    return this.cursorUrl;
+  },
+
+  create() {
+    if (this.active) return;
+    this.active = true;
+
+    const url = this.buildCursor();
+    const style = document.createElement("style");
+    style.id = this.styleId;
+    style.textContent = `
+      html.${this.class}, html.${this.class} * {
+        cursor: url("${url}") 6 2, auto !important;
+      }
+    `;
+    document.documentElement.appendChild(style);
+    document.documentElement.classList.add(this.class);
+
+    this.clickHandler = (e) => this.ripple(e.clientX, e.clientY);
+    this.moveHandler = (e) => this.trail(e.clientX, e.clientY);
+    document.addEventListener("pointerdown", this.clickHandler, true);
+    document.addEventListener("mousemove", this.moveHandler);
+  },
+
+  // 点击涟漪：以点击点为圆心扩散的粉色圆环
+  ripple(x, y) {
+    const el = document.createElement("div");
+    el.className = `${PREFIX}-ripple`;
+    el.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      width: 14px;
+      height: 14px;
+      margin: -7px 0 0 -7px;
+      border: 3px solid #ff4081;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 2147483647;
+      transition: transform 0.45s ease-out, opacity 0.45s ease-out;
+    `;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => {
+      el.style.transform = "scale(4)";
+      el.style.opacity = "0";
+    });
+    setTimeout(() => el.remove(), 500);
+  },
+
+  // 鼠标拖尾：淡出的青色小圆点（限流，最多保留 12 个）
+  trail(x, y) {
+    const now = Date.now();
+    if (now - this.lastTrail < 60) return;
+    this.lastTrail = now;
+
+    const dot = document.createElement("div");
+    dot.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      width: 8px;
+      height: 8px;
+      margin: -4px 0 0 -4px;
+      border-radius: 50%;
+      background: #00e5ff;
+      opacity: 0.55;
+      pointer-events: none;
+      z-index: 2147483645;
+      transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    `;
+    document.body.appendChild(dot);
+    this.trailEls.push(dot);
+
+    requestAnimationFrame(() => {
+      dot.style.opacity = "0";
+      dot.style.transform = "scale(0.4)";
+    });
+    setTimeout(() => {
+      dot.remove();
+      this.trailEls = this.trailEls.filter((d) => d !== dot);
+    }, 550);
+
+    if (this.trailEls.length > 12) {
+      const oldest = this.trailEls.shift();
+      oldest.remove();
+    }
+  },
+
+  destroy() {
+    this.active = false;
+    document.documentElement.classList.remove(this.class);
+    const style = document.getElementById(this.styleId);
+    if (style) style.remove();
+
+    if (this.clickHandler) {
+      document.removeEventListener("pointerdown", this.clickHandler, true);
+      this.clickHandler = null;
+    }
+    if (this.moveHandler) {
+      document.removeEventListener("mousemove", this.moveHandler);
+      this.moveHandler = null;
+    }
+
+    this.trailEls.forEach((d) => d.remove());
+    this.trailEls = [];
+    document
+      .querySelectorAll(`.${PREFIX}-ripple`)
+      .forEach((r) => r.remove());
+  },
+};
+
 const Crosshair = {
   elements: [],
 
@@ -629,6 +808,18 @@ function applyFeatures(features) {
     ReadingGuide.destroy();
   }
 
+  if (features.typography) {
+    Typography.apply();
+  } else {
+    Typography.remove();
+  }
+
+  if (features.bigCursor) {
+    BigCursor.create();
+  } else {
+    BigCursor.destroy();
+  }
+
   ColorBlindness.apply(features.colorBlindMode);
 }
 
@@ -645,6 +836,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         msg.enabled ? Crosshair.create() : Crosshair.destroy();
       } else if (msg.feature === "readingGuide") {
         msg.enabled ? ReadingGuide.create() : ReadingGuide.destroy();
+      } else if (msg.feature === "typography") {
+        msg.enabled ? Typography.apply() : Typography.remove();
+      } else if (msg.feature === "bigCursor") {
+        msg.enabled ? BigCursor.create() : BigCursor.destroy();
       }
       break;
 

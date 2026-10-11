@@ -6,6 +6,8 @@ const DEFAULT_STATE = {
     textReader: false,
     crosshair: false,
     readingGuide: false,
+    typography: false,
+    bigCursor: false,
     colorBlindMode: "off",
   },
   apiKey: "",
@@ -215,6 +217,24 @@ chrome.commands.onCommand.addListener(async (command) => {
       await chrome.tabs.sendMessage(tab.id, {
         type: "TOGGLE_FEATURE",
         feature: "readingGuide",
+        enabled: newValue,
+      });
+    } else if (command === "toggle-typography") {
+      const newValue = !state.features.typography;
+      state.features.typography = newValue;
+      await saveState(state);
+      await chrome.tabs.sendMessage(tab.id, {
+        type: "TOGGLE_FEATURE",
+        feature: "typography",
+        enabled: newValue,
+      });
+    } else if (command === "toggle-bigcursor") {
+      const newValue = !state.features.bigCursor;
+      state.features.bigCursor = newValue;
+      await saveState(state);
+      await chrome.tabs.sendMessage(tab.id, {
+        type: "TOGGLE_FEATURE",
+        feature: "bigCursor",
         enabled: newValue,
       });
     } else if (command === "cycle-colorblind") {
