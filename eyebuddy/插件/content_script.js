@@ -13,6 +13,7 @@ const DEFAULT_STATE = {
     textReader: false,
     crosshair: false,
     colorBlindMode: "off",
+    danmakuSummary: false,
   },
   readingRate: 0.9,
 };
@@ -58,11 +59,11 @@ const AIDescription = {
     }
   },
 
-  showLoading() {
+  showLoading(text = "🔍 正在分析页面画面...") {
     this.closePanel();
     const panel = document.createElement("div");
     panel.className = `${PREFIX}-ai-panel`;
-    panel.textContent = "🔍 正在分析页面画面...";
+    panel.textContent = text;
     panel.style.cssText = `
       position: fixed;
       top: 50%;
@@ -354,8 +355,11 @@ const TextReader = {
     this.speak(text);
   },
 
-  speak(text, el) {
-    if (!("speechSynthesis" in window)) return;
+  speak(text, el, onEnd) {
+    if (!("speechSynthesis" in window)) {
+      if (onEnd) onEnd();
+      return;
+    }
 
     this.clearHighlight();
     this.stop();
@@ -375,9 +379,11 @@ const TextReader = {
     const targetEl = el || null;
     utterance.onend = () => {
       if (this.highlightedEl === targetEl) this.clearHighlight();
+      if (onEnd) onEnd();
     };
     utterance.onerror = () => {
       if (this.highlightedEl === targetEl) this.clearHighlight();
+      if (onEnd) onEnd();
     };
 
     window.speechSynthesis.speak(utterance);
@@ -527,6 +533,218 @@ const ColorBlindness = {
   },
 };
 
+const DanmakuSummary = {
+  enabled: false,
+  busy: false,
+  autoTimer: null,
+  urlWatcher: null,
+  lastUrl: "",
+  summarizedUrl: "",
+  state: "idle",
+
+  setState(s) {
+    this.state = s;
+    if (typeof DanmakuButton !== "undefined") DanmakuButton.update(s);
+  },
+
+  isBilibiliVideoPage() {
+    return /^https?:\/\/www\.bilibili\.com\/video\/BV[\w]+/.test(
+      location.href,
+    );
+  },
+
+  extractVideoIds() {
+    const bvid = location.pathname.match(/BV[\w]+/)?.[0] || "";
+    const html = document.documentElement.innerHTML;
+    const match = html.match(/"cid":(\d+)/);
+    if (match) return { bvid, cid: parseInt(match[1]) };
+    return null;
+  },
+
+  enable() {
+    if (this.enabled) return;
+    this.enabled = true;
+    this.lastUrl = location.href;
+    this.scheduleAuto();
+    this.urlWatcher = setInterval(() => this.checkUrlChange(), 1500);
+  },
+
+  disable() {
+    this.enabled = false;
+    clearTimeout(this.autoTimer);
+    if (this.urlWatcher) {
+      clearInterval(this.urlWatcher);
+      this.urlWatcher = null;
+    }
+  },
+
+  checkUrlChange() {
+    if (location.href !== this.lastUrl) {
+      this.lastUrl = location.href;
+      this.scheduleAuto();
+    }
+  },
+
+  scheduleAuto() {
+    clearTimeout(this.autoTimer);
+    if (!this.isBilibiliVideoPage()) return;
+    if (location.href === this.summarizedUrl) return;
+    this.autoTimer = setTimeout(() => {
+      if (this.enabled && this.isBilibiliVideoPage()) this.run(true);
+    }, 3000);
+  },
+
+  async run(isAuto = false) {
+    if (this.busy) return;
+
+    if (!this.isBilibiliVideoPage()) {
+      AIDescription.showPanel("⚠️ 当前页面不是B站视频页", true);
+      return;
+    }
+
+    const ids = this.extractVideoIds();
+    if (!ids || !ids.cid) {
+      AIDescription.showPanel("⚠️ 无法获取视频弹幕ID", true);
+      return;
+    }
+
+    this.busy = true;
+    this.setState("loading");
+    AIDescription.showLoading("💬 正在抓取并总结弹幕...");
+
+    try {
+      const resp = await chrome.runtime.sendMessage({
+        type: "FETCH_DANMAKU",
+        bvid: ids.bvid,
+        cid: ids.cid,
+      });
+
+      if (resp && resp.summary) {
+        this.summarizedUrl = location.href;
+        AIDescription.showPanel("💬 弹幕总结：" + resp.summary);
+        this.setState("speaking");
+        TextReader.speak(resp.summary, null, () => this.setState("idle"));
+      } else if (resp && resp.error) {
+        AIDescription.showPanel("⚠️ " + resp.error, true);
+        this.setState("idle");
+      } else {
+        AIDescription.showPanel("⚠️ 弹幕总结失败", true);
+        this.setState("idle");
+      }
+    } catch (e) {
+      AIDescription.showPanel("⚠️ 弹幕总结失败", true);
+      this.setState("idle");
+    } finally {
+      this.busy = false;
+    }
+  },
+};
+
+const DanmakuButton = {
+  btn: null,
+  state: "idle",
+
+  ensure() {
+    if (this.btn || !document.body) return;
+
+    const btn = document.createElement("button");
+    btn.id = `${PREFIX}-dm-btn`;
+    btn.type = "button";
+    btn.setAttribute("aria-label", "总结本视频弹幕并语音播报");
+    btn.style.cssText = `
+      position: fixed;
+      right: 24px;
+      top: 45%;
+      z-index: 2147483645;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 22px;
+      background: #fb7299;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      box-shadow: 0 4px 16px rgba(251, 114, 153, 0.4);
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+      pointer-events: auto;
+    `;
+    btn.innerHTML = `<span style="font-size:16px;line-height:1">💬</span><span class="${PREFIX}-dm-label">弹幕总结</span>`;
+
+    btn.addEventListener("mouseenter", () => {
+      if (this.state !== "idle") return;
+      btn.style.transform = "scale(1.06)";
+      btn.style.boxShadow = "0 6px 20px rgba(251, 114, 153, 0.55)";
+    });
+    btn.addEventListener("mouseleave", () => {
+      btn.style.transform = "";
+      btn.style.boxShadow = "0 4px 16px rgba(251, 114, 153, 0.4)";
+    });
+    btn.addEventListener("click", () => {
+      if (DanmakuSummary.busy) return;
+      DanmakuSummary.run(false);
+    });
+
+    document.body.appendChild(btn);
+    this.btn = btn;
+    this.update(DanmakuSummary.state);
+  },
+
+  remove() {
+    if (this.btn) {
+      this.btn.remove();
+      this.btn = null;
+    }
+  },
+
+  update(state) {
+    this.state = state;
+    if (!this.btn) return;
+    const label = this.btn.querySelector(`.${PREFIX}-dm-label`);
+    if (!label) return;
+
+    if (state === "loading") {
+      label.textContent = "分析中…";
+      this.btn.style.background = "#f4a7bc";
+      this.btn.style.cursor = "wait";
+    } else if (state === "speaking") {
+      label.textContent = "播报中…";
+      this.btn.style.background = "#fb7299";
+      this.btn.style.cursor = "default";
+    } else {
+      label.textContent = "弹幕总结";
+      this.btn.style.background = "#fb7299";
+      this.btn.style.cursor = "pointer";
+    }
+  },
+
+  syncVisibility() {
+    if (DanmakuSummary.isBilibiliVideoPage()) {
+      if (document.body) this.ensure();
+      else
+        document.addEventListener("DOMContentLoaded", () => this.ensure(), {
+          once: true,
+        });
+    } else {
+      this.remove();
+    }
+  },
+
+  init() {
+    let lastUrl = location.href;
+    setInterval(() => {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        this.syncVisibility();
+      }
+    }, 1500);
+    this.syncVisibility();
+  },
+};
+
 function applyFeatures(features) {
   if (features.aiDescription) {
     AIDescription.enable();
@@ -553,6 +771,12 @@ function applyFeatures(features) {
   }
 
   ColorBlindness.apply(features.colorBlindMode);
+
+  if (features.danmakuSummary) {
+    DanmakuSummary.enable();
+  } else {
+    DanmakuSummary.disable();
+  }
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -566,6 +790,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         msg.enabled ? TextReader.enable() : TextReader.disable();
       } else if (msg.feature === "crosshair") {
         msg.enabled ? Crosshair.create() : Crosshair.destroy();
+      } else if (msg.feature === "danmakuSummary") {
+        msg.enabled ? DanmakuSummary.enable() : DanmakuSummary.disable();
       }
       break;
 
@@ -575,6 +801,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     case "SCAN_NOW":
       AIDescription.describePage();
+      break;
+
+    case "DANMAKU_SUMMARY_NOW":
+      DanmakuSummary.run();
       break;
 
     case "SET_READING_RATE":
@@ -591,6 +821,7 @@ async function init() {
   const state = await getState();
   TextReader.rate = state.readingRate || 0.9;
   applyFeatures(state.features);
+  DanmakuButton.init();
 }
 
 init();
