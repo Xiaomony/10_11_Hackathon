@@ -16,7 +16,7 @@ const DEFAULT_STATE = {
   readingRate: 0.9,
 };
 
-// AI 视觉服务：Agnes AI（OpenAI 兼容接口）。
+// AI 服务：Agnes AI（OpenAI 兼容接口），同一模型同时承担视觉与文本任务。
 // 如需切换服务商，只需修改这两个常量（请求/响应格式均为 OpenAI Chat Completions）。
 const AGNES_API_URL = "https://api.agnes-ai.cn/v1/chat/completions";
 const AGNES_MODEL = "agnes-3.0-flash";
@@ -66,28 +66,11 @@ async function buildApiError(response) {
   }
 }
 
-async function callVisionAPI(
-  imageDataUrl,
-  apiKey,
-  colorBlindMode,
-  customPrompt,
-) {
-  let prompt =
-    customPrompt ||
-    "请用中文描述这个网页画面的内容，包括页面布局、图片、文字区域、按钮等可见元素，不超过100字。";
-
-  // 四功能协同：色盲模式开启时，AI 描述自动补充颜色信息
-  if (colorBlindMode && colorBlindMode !== "off") {
-    const modeNames = {
-      protanopia: "红绿色盲",
-      deuteranomaly: "绿色弱",
-      tritanopia: "蓝黄色盲",
-    };
-    prompt = customPrompt
-      ? `${customPrompt}（用户开启了${modeNames[colorBlindMode]}校正模式，请在描述中标注关键元素的颜色，如"红色按钮""蓝色标题"。）`
-      : `用户当前处于${modeNames[colorBlindMode]}色盲校正模式。请用中文描述这个网页画面的内容，包括页面布局、图片、文字区域、按钮等可见元素，并在描述中标注关键元素的颜色（如"红色按钮""绿色链接""蓝色标题"），不超过120字。`;
-  }
-
+/**
+ * Agnes（OpenAI 兼容）接口的统一调用入口。
+ * messages 为标准 chat 消息数组（可含图片），后续 AI Agent 的多轮对话直接复用本函数。
+ */
+async function agnesChat(messages, apiKey, maxTokens = 300) {
   let response;
   try {
     response = await fetch(AGNES_API_URL, {
@@ -98,16 +81,8 @@ async function callVisionAPI(
       },
       body: JSON.stringify({
         model: AGNES_MODEL,
-        max_tokens: 300,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image_url", image_url: { url: imageDataUrl } },
-            ],
-          },
-        ],
+        max_tokens: maxTokens,
+        messages,
       }),
     });
   } catch (networkErr) {
@@ -130,7 +105,62 @@ async function callVisionAPI(
   return typeof content === "string" ? content : JSON.stringify(content);
 }
 
-async function handleDescribePage() {
+async function callVisionAPI(
+  imageDataUrl,
+  apiKey,
+  colorBlindMode,
+  customPrompt,
+) {
+  let prompt =
+    customPrompt ||
+    "请用中文描述这个网页画面的内容，包括页面布局、图片、文字区域、按钮等可见元素，不超过100字。";
+
+  // 四功能协同：色盲模式开启时，AI 描述自动补充颜色信息
+  if (colorBlindMode && colorBlindMode !== "off") {
+    const modeNames = {
+      protanopia: "红绿色盲",
+      deuteranomaly: "绿色弱",
+      tritanopia: "蓝黄色盲",
+    };
+    prompt = customPrompt
+      ? `${customPrompt}（用户开启了${modeNames[colorBlindMode]}校正模式，请在描述中标注关键元素的颜色，如"红色按钮""蓝色标题"。）`
+      : `用户当前处于${modeNames[colorBlindMode]}色盲校正模式。请用中文描述这个网页画面的内容，包括页面布局、图片、文字区域、按钮等可见元素，并在描述中标注关键元素的颜色（如"红色按钮""绿色链接""蓝色标题"），不超过120字。`;
+  }
+
+  return agnesChat(
+    [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: imageDataUrl } },
+        ],
+      },
+    ],
+    apiKey,
+  );
+}
+
+/**
+ * 文本模式：把无障碍树发给 Agnes 生成页面概述。
+ * 比截图视觉模型更快、更省 token，且元素编号可被后续 Agent 引用。
+ */
+async function callA11yText({ title, url, tree, elementCount }, apiKey) {
+  const prompt =
+    `你是一名面向视障用户的网页阅读助手。以下是网页《${title || "(无标题)"}》（${url}）的无障碍树，` +
+    "它是页面可见元素的精简结构：每行格式为「[编号] 角色: 名称」，缩进表示包含关系；" +
+    "常见角色有 heading(标题)、link(链接)、button(按钮)、textbox(输入框)、img(图片)、video(视频)，" +
+    "以及 navigation/main/banner 等页面分区；共约 " +
+    (elementCount || 0) +
+    " 个元素。\n" +
+    "请用中文向视障用户概述：1)这是什么页面；2)主要分区与布局；3)重点内容和可以进行的操作。" +
+    "控制在150字以内，直接输出描述本身，不要分点、不要标题。\n\n" +
+    tree;
+
+  return agnesChat([{ role: "user", content: prompt }], apiKey, 400);
+}
+
+async function handleDescribePage(msg = {}) {
   const state = await getState();
 
   // 演示模式：无需 API Key，返回预置的整页描述
@@ -145,6 +175,20 @@ async function handleDescribePage() {
     return { error: "请先在插件设置中配置 API Key" };
   }
 
+  const colorBlindOn =
+    state.features.colorBlindMode && state.features.colorBlindMode !== "off";
+
+  // 优先：无障碍树 + 文本调用（色盲模式需要标注颜色，仍走视觉模型）
+  if (msg.mode === "a11y" && msg.tree && !colorBlindOn) {
+    try {
+      const description = await callA11yText(msg, state.apiKey);
+      return { description, mode: "a11y" };
+    } catch (e) {
+      console.warn("无障碍树解析失败，回退截图模式：", e.message);
+    }
+  }
+
+  // 兜底：可视区域截图 + 视觉模型
   try {
     // JPEG 压缩：整页 PNG 可达数 MB，JPEG q80 通常仅几百 KB
     const dataUrl = await chrome.tabs.captureVisibleTab(null, {
@@ -156,7 +200,7 @@ async function handleDescribePage() {
       state.apiKey,
       state.features.colorBlindMode,
     );
-    return { description };
+    return { description, mode: "screenshot" };
   } catch (e) {
     console.error("瞳伴 API 错误:", e);
     return { error: e.message || "截图或 API 调用失败" };
@@ -368,7 +412,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "DESCRIBE_PAGE") {
-    handleDescribePage().then(sendResponse);
+    handleDescribePage(msg).then(sendResponse);
     return true;
   }
   if (msg.type === "CAPTURE_SCREEN") {
