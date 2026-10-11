@@ -7,7 +7,7 @@
 - **面向人群**：全盲 / 重度视障、低视力 / 老年、色盲 / 色弱
 - **形态**：Chrome 浏览器插件（Manifest V3）
 - **成本**：纯前端 + 免费 API，零硬件成本
-- **AI 能力**：通义千问 Qwen-VL 多模态视觉模型
+- **AI 能力**：Agnes AI `agnes-3.0-flash` 多模态模型
 
 ---
 
@@ -32,7 +32,7 @@
 
 | # | 功能 | 服务人群 | 技术 |
 |---|------|----------|------|
-| ① | **AI 页面描述** | 全盲 / 重度视障 | 通义千问 Qwen-VL 多模态视觉模型 |
+| ① | **AI 页面描述** | 全盲 / 重度视障 | Agnes AI 多模态模型 |
 | ② | **文字朗读 + 黄色高亮** | 低视力 / 老年 | Web Speech API + DOM 高亮 |
 | ③ | **鼠标十字准星** | 低视力 / 老年 | 固定定位十字线 + 焦点环 |
 | ④ | **大光标与点击反馈** | 低视力 / 老年 | canvas 大箭头指针 + 点击涟漪 + 拖尾 |
@@ -42,12 +42,12 @@
 
 ### ① AI 页面描述
 
-截取网页画面，调用通义千问 Qwen-VL 生成中文描述，再用语音合成播报给用户。不替代屏幕阅读器，而是增强它——让图片、图表、复杂布局能"听"到。
+优先把页面压缩为无障碍树文本发给 Agnes AI 生成中文描述（失败时回退整页截图走视觉模型），再用语音合成播报给用户。不替代屏幕阅读器，而是增强它——让图片、图表、复杂布局能"听"到。
 
-- 一键截图分析，描述整个页面布局和内容
-- 通义千问 Qwen-VL，中文描述质量最佳
+- 一键分析，描述整个页面布局和内容
+- 无障碍树文本优先，更快更省 token；截图视觉模型兜底
 - 自动语音播报，与文字朗读功能联动
-- 免费 100 万 tokens / 月，零成本
+- Agnes AI 活动期免费额度，零成本
 
 ### ② 文字朗读 + 黄色高亮
 
@@ -115,27 +115,15 @@ SVG 色彩矩阵滤镜，三种模式一键切换，覆盖最常见色盲类型�
 
 ## 安装与使用
 
-### 方式一：加载完整插件（推荐，体验全部功能）
-
 1. 克隆或下载本仓库
    ```bash
-   git clone https://github.com/Wayhhow/EyeBuddy.git
+   git clone https://github.com/Xiaomony/10_11_Hackathon.git
    ```
 2. 打开 Chrome，地址栏输入 `chrome://extensions`
 3. 右上角开启**开发者模式**
 4. 点击**加载已解压**，选择仓库内的 `插件/` 文件夹
 5. 点击浏览器工具栏的瞳伴图标，完成首次引导
 6. 在插件弹窗的**设置**中填入 Agnes AI API Key（[Agnes AI 平台免费申请](https://platform.agnes-ai.cn/)，活动页 https://agnes-ai.cn/campaign ，当前 `agnes-3.0-flash` 多模态模型免费额度）
-
-### 方式二：在线浏览展示页（无需安装）
-
-直接在浏览器中打开仓库根目录的 `展示页.html`，可查看完整产品介绍 + 3 个交互式迷你 Demo：
-
-- AI 描述模拟
-- 文字朗读真实体验
-- 色盲滤镜实时切换
-
-> 展示页的迷你 Demo 不需要 API Key，开箱即用。
 
 ---
 
@@ -166,13 +154,12 @@ SVG 色彩矩阵滤镜，三种模式一键切换，覆盖最常见色盲类型�
 EyeBuddy/
 ├── 插件/                      # Chrome 插件源码（Manifest V3）
 │   ├── manifest.json          # 插件清单
-│   ├── background.js          # Service Worker（Qwen-VL 调用 + 消息路由）
+│   ├── background.js          # Service Worker（Agnes AI 调用 + 消息路由）
 │   ├── content_script.js      # 内容脚本（朗读 / 准星 / 排版增强 / 大光标 / 阅读辅助线 / 色盲滤镜注入）
 │   ├── popup.html             # 弹窗 UI
 │   ├── popup.css              # 弹窗样式
 │   ├── popup.js               # 弹窗逻辑（状态管理 + 设置）
 │   └── icons/                 # 插件图标（16/48/128）
-├── 展示页.html                 # 产品介绍 + 交互式迷你 Demo
 ├── .gitignore
 └── README.md
 ```
@@ -184,7 +171,7 @@ EyeBuddy/
 | 层 | 技术 | 说明 |
 |----|------|------|
 | 插件架构 | Chrome Manifest V3 | Service Worker + Content Script + Popup 三层 |
-| AI 视觉 | 通义千问 Qwen-VL | 多模态视觉模型，中文描述质量最佳 |
+| AI 视觉 | Agnes AI `agnes-3.0-flash` | 多模态模型，文本/图像统一接口 |
 | 语音合成 | Web Speech API | 浏览器内置 `SpeechSynthesisUtterance`，零成本 |
 | 色盲校正 | SVG feColorMatrix | 3 模式色彩矩阵滤镜，纯 CSS 实现 |
 | 网页截图 | `chrome.tabs.captureVisibleTab` | 系统级截图 API |
@@ -245,7 +232,7 @@ git clone https://github.com/Wayhhow/EyeBuddy.git
 
 | 消息类型 | 触发 | 处理 |
 |----------|------|------|
-| `DESCRIBE_PAGE` | 用户点击 AI 描述 / `Ctrl+Shift+A` | Background 调用 Qwen-VL |
+| `DESCRIBE_PAGE` | 用户点击 AI 描述 / `Ctrl+Shift+A` | Background 调用 Agnes AI |
 | `TOGGLE_CROSSHAIR` | 快捷键 / Popup 开关 | Content Script 切换准星 |
 | `TOGGLE_READER` | 快捷键 / Popup 开关 | Content Script 切换朗读 |
 | `CYCLE_COLORBLIND` | 快捷键 / Popup 开关 | Content Script 切换滤镜 |
@@ -286,8 +273,8 @@ git clone https://github.com/Wayhhow/EyeBuddy.git
 
 本项目由 **Weihao Wu** 开发，参加 **TRAE AI 创造力大赛 · 社会服务赛道 + 社会公益附加赛**。
 
-如需二次开发或商用，请联系作者。插件源码中不包含任何第三方专有代码，AI 能力依赖通义千问 Qwen-VL API（按阿里云百炼平台服务条款使用）。
+如需二次开发或商用，请联系作者。插件源码中不包含任何第三方专有代码，AI 能力依赖 Agnes AI API（按其平台服务条款使用）。
 
 ---
 
-*瞳伴 EyeBuddy — 一个插件，四种功能，一站解决视障人群上网的视觉障碍。*
+*瞳伴 EyeBuddy — 一个插件，八种功能，一站解决视障人群上网的视觉障碍。*
