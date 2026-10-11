@@ -4,6 +4,93 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="popup.css" />
+    <style>
+      @keyframes voice-pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(255, 80, 80, 0.55);
+        }
+        70% {
+          box-shadow: 0 0 0 14px rgba(255, 80, 80, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(255, 80, 80, 0);
+        }
+      }
+      #voice-panel {
+        padding: 14px 16px 10px;
+      }
+      #voice-panel.hidden {
+        display: none;
+      }
+      .voice-chat {
+        min-height: 150px;
+        margin: 12px 0;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+      .voice-msg {
+        margin-bottom: 10px;
+      }
+      .voice-msg.ai {
+        color: #7df9ff;
+      }
+      .voice-msg.user {
+        color: #e8eef5;
+        font-weight: 600;
+      }
+      .voice-msg.hidden {
+        display: none;
+      }
+      .voice-input-row {
+        display: flex;
+        gap: 8px;
+        align-items: stretch;
+      }
+      #voice-input {
+        flex: 1;
+        font-size: 14px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid #233046;
+        background: #0a0f1a;
+        color: #e8eef5;
+        outline: none;
+        min-width: 0;
+      }
+      #voice-input:focus {
+        border-color: #00e5ff;
+      }
+      #voice-mic {
+        width: 46px;
+        border: none;
+        border-radius: 10px;
+        background: #101828;
+        font-size: 20px;
+        cursor: pointer;
+      }
+      #voice-mic.listening {
+        background: rgba(255, 70, 70, 0.18);
+        animation: voice-pulse 0.9s infinite;
+      }
+      #voice-send {
+        padding: 0 18px;
+        border: none;
+        border-radius: 10px;
+        background: #00b8d4;
+        color: #04141a;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #voice-status {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #5a6a82;
+        min-height: 16px;
+      }
+      #voice-status.listening {
+        color: #ff8080;
+      }
+    </style>
     <title>瞳伴 EyeBuddy</title>
   </head>
   <body>
@@ -303,6 +390,36 @@
           </div>
         </div>
       </details>
+
+      <div class="feature-group">
+        <button id="open-voice" class="btn-action" style="width: 100%">
+          🎤 语音助手（演示）
+        </button>
+        <span class="shortcut-hint">说一句话，帮你打开网站</span>
+      </div>
+
+      <div id="voice-panel" class="hidden">
+        <button id="voice-back" class="btn-text">← 返回功能面板</button>
+        <div class="voice-chat">
+          <div class="voice-msg ai" id="voice-hint">
+            你好，我是瞳伴语音助手。点击麦克风，或直接输入指令。
+          </div>
+          <div class="voice-msg user hidden" id="voice-user"></div>
+          <div class="voice-msg ai hidden" id="voice-ai"></div>
+        </div>
+        <div class="voice-input-row">
+          <input
+            type="text"
+            id="voice-input"
+            placeholder="例如：帮我打开bilibili"
+            aria-label="语音指令输入框"
+            autocomplete="off"
+          />
+          <button id="voice-mic" title="语音识别（演示）">🎙️</button>
+          <button id="voice-send">发送</button>
+        </div>
+        <div id="voice-status">随便说什么，我都会帮你打开 bilibili</div>
+      </div>
 
       <footer class="panel-footer">
         <button id="show-onboarding" class="btn-text">重新引导</button>
