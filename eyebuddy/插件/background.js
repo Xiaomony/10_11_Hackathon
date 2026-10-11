@@ -8,38 +8,14 @@ const DEFAULT_STATE = {
     colorBlindMode: "off",
   },
   apiKey: "",
+  demoMode: false,
   readingRate: 0.9,
 };
 
-const QWEN_API_URL =
-  "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-const QWEN_MODEL = "qwen-vl-plus"; // 视觉模型：截图/图片描述
-const QWEN_TEXT_MODEL = "qwen-plus"; // 文本模型：无障碍树解析（后续 Agent 对话也复用）
-
-/**
- * DashScope OpenAI 兼容接口的统一调用入口。
- * messages 为标准 chat 消息数组，后续 AI Agent 的多轮对话直接复用本函数。
- */
-async function dashscopeChat(messages, apiKey, model = QWEN_TEXT_MODEL) {
-  const response = await fetch(QWEN_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ model, messages }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`API ${response.status}: ${errText}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("模型返回为空");
-  return typeof content === "string" ? content : JSON.stringify(content);
-}
+// AI 服务：Agnes AI（OpenAI 兼容接口），同一模型同时承担视觉与文本任务。
+// 如需切换服务商，只需修改这两个常量（请求/响应格式均为 OpenAI Chat Completions）。
+const AGNES_API_URL = "https://api.agnes-ai.cn/v1/chat/completions";
+const AGNES_MODEL = "agnes-3.0-flash";
 
 async function getState() {
   const result = await chrome.storage.local.get("eyebuddyState");
@@ -55,7 +31,82 @@ async function getActiveTab() {
   return tab;
 }
 
-async function callQwenVL(imageBase64, apiKey, colorBlindMode, customPrompt) {
+// 把 Agnes（OpenAI 兼容）错误响应转换为用户可读懂的中文提示
+async function buildApiError(response) {
+  let serverMsg = "";
+  try {
+    const errText = await response.text();
+    try {
+      const errJson = JSON.parse(errText);
+      serverMsg =
+        errJson?.error?.message || errJson?.message || errJson?.msg || errText;
+    } catch {
+      serverMsg = errText;
+    }
+  } catch {
+    serverMsg = "";
+  }
+  serverMsg = String(serverMsg || "").trim().slice(0, 300);
+  const suffix = serverMsg ? `：${serverMsg}` : "";
+  switch (response.status) {
+    case 401:
+      return "API Key 无效或已失效，请重新检查设置中的 Agnes API Key";
+    case 403:
+      return `API Key 无访问权限、账户欠费或未开通模型权限${suffix}`;
+    case 404:
+      return `接口地址或模型名称不存在（404），请确认模型 ${AGNES_MODEL} 是否可用${suffix}`;
+    case 429:
+      return `请求过于频繁或免费额度已用完（429）${suffix}`;
+    default:
+      return `API 调用失败（HTTP ${response.status}）${suffix}`;
+  }
+}
+
+/**
+ * Agnes（OpenAI 兼容）接口的统一调用入口。
+ * messages 为标准 chat 消息数组（可含图片），后续 AI Agent 的多轮对话直接复用本函数。
+ */
+async function agnesChat(messages, apiKey, maxTokens = 300) {
+  let response;
+  try {
+    response = await fetch(AGNES_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: AGNES_MODEL,
+        max_tokens: maxTokens,
+        messages,
+      }),
+    });
+  } catch (networkErr) {
+    throw new Error(
+      `无法连接 Agnes API 服务器（${AGNES_API_URL}），请检查网络：${networkErr.message}`,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(await buildApiError(response));
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error(
+      "API 返回内容为空或响应格式异常：" + JSON.stringify(data).slice(0, 200),
+    );
+  }
+  return typeof content === "string" ? content : JSON.stringify(content);
+}
+
+async function callVisionAPI(
+  imageDataUrl,
+  apiKey,
+  colorBlindMode,
+  customPrompt,
+) {
   let prompt =
     customPrompt ||
     "请用中文描述这个网页画面的内容，包括页面布局、图片、文字区域、按钮等可见元素，不超过100字。";
@@ -72,26 +123,25 @@ async function callQwenVL(imageBase64, apiKey, colorBlindMode, customPrompt) {
       : `用户当前处于${modeNames[colorBlindMode]}色盲校正模式。请用中文描述这个网页画面的内容，包括页面布局、图片、文字区域、按钮等可见元素，并在描述中标注关键元素的颜色（如"红色按钮""绿色链接""蓝色标题"），不超过120字。`;
   }
 
-  return dashscopeChat(
+  return agnesChat(
     [
       {
         role: "user",
         content: [
           { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: imageBase64 } },
+          { type: "image_url", image_url: { url: imageDataUrl } },
         ],
       },
     ],
     apiKey,
-    QWEN_MODEL,
   );
 }
 
 /**
- * 文本模式：把无障碍树发给 qwen-plus 生成页面概述。
+ * 文本模式：把无障碍树发给 Agnes 生成页面概述。
  * 比截图视觉模型更快、更省 token，且元素编号可被后续 Agent 引用。
  */
-async function callQwenText({ title, url, tree, elementCount }, apiKey) {
+async function callA11yText({ title, url, tree, elementCount }, apiKey) {
   const prompt =
     `你是一名面向视障用户的网页阅读助手。以下是网页《${title || "(无标题)"}》（${url}）的无障碍树，` +
     "它是页面可见元素的精简结构：每行格式为「[编号] 角色: 名称」，缩进表示包含关系；" +
@@ -103,15 +153,19 @@ async function callQwenText({ title, url, tree, elementCount }, apiKey) {
     "控制在150字以内，直接输出描述本身，不要分点、不要标题。\n\n" +
     tree;
 
-  return dashscopeChat(
-    [{ role: "user", content: prompt }],
-    apiKey,
-    QWEN_TEXT_MODEL,
-  );
+  return agnesChat([{ role: "user", content: prompt }], apiKey, 400);
 }
 
 async function handleDescribePage(msg = {}) {
   const state = await getState();
+
+  // 演示模式：无需 API Key，返回预置的整页描述
+  if (state.demoMode) {
+    return {
+      description:
+        "这是一个资讯类网页：顶部是网站标题和导航栏，中间是文章正文，配有两张插图，底部有一排相关内容的链接。",
+    };
+  }
 
   if (!state.apiKey) {
     return { error: "请先在插件设置中配置 API Key" };
@@ -120,10 +174,10 @@ async function handleDescribePage(msg = {}) {
   const colorBlindOn =
     state.features.colorBlindMode && state.features.colorBlindMode !== "off";
 
-  // 优先：无障碍树 + 文本模型（色盲模式需要标注颜色，仍走视觉模型）
+  // 优先：无障碍树 + 文本调用（色盲模式需要标注颜色，仍走视觉模型）
   if (msg.mode === "a11y" && msg.tree && !colorBlindOn) {
     try {
-      const description = await callQwenText(msg, state.apiKey);
+      const description = await callA11yText(msg, state.apiKey);
       return { description, mode: "a11y" };
     } catch (e) {
       console.warn("无障碍树解析失败，回退截图模式：", e.message);
@@ -132,18 +186,20 @@ async function handleDescribePage(msg = {}) {
 
   // 兜底：可视区域截图 + 视觉模型
   try {
+    // JPEG 压缩：整页 PNG 可达数 MB，JPEG q80 通常仅几百 KB
     const dataUrl = await chrome.tabs.captureVisibleTab(null, {
-      format: "png",
+      format: "jpeg",
+      quality: 80,
     });
-    const description = await callQwenVL(
+    const description = await callVisionAPI(
       dataUrl,
       state.apiKey,
       state.features.colorBlindMode,
     );
     return { description, mode: "screenshot" };
   } catch (e) {
-    console.error("瞳伴 API 错误:", e.message);
-    return { error: "页面解析失败，请检查 Key 和网络" };
+    console.error("瞳伴 API 错误:", e);
+    return { error: e.message || "截图或 API 调用失败" };
   }
 }
 
@@ -156,7 +212,7 @@ async function handleDescribeImage(imageBase64) {
   }
 
   try {
-    const description = await callQwenVL(
+    const description = await callVisionAPI(
       imageBase64,
       state.apiKey,
       state.features.colorBlindMode,
@@ -164,8 +220,8 @@ async function handleDescribeImage(imageBase64) {
     );
     return { description };
   } catch (e) {
-    console.error("瞳伴图片描述错误:", e.message);
-    return { error: "图片描述失败，请检查 Key 和网络" };
+    console.error("瞳伴图片描述错误:", e);
+    return { error: e.message || "图片描述失败" };
   }
 }
 

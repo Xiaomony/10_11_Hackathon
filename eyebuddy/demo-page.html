@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>瞳伴 EyeBuddy · 路演演示页</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "Microsoft YaHei", sans-serif;
+      background: #070a10;
+      color: #e8eef5;
+      padding: 30px 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 34px; display: flex; align-items: center; gap: 14px; }
+    .sub { font-size: 18px; color: #8b9bb4; margin: 10px 0 8px; }
+    .question {
+      font-size: 26px;
+      color: #7df9ff;
+      margin: 26px 0 22px;
+      font-weight: 600;
+    }
+    .grid { display: flex; gap: 28px; flex-wrap: wrap; }
+    .card { flex: 1; min-width: 300px; }
+    .card img {
+      width: 100%;
+      border-radius: 14px;
+      display: block;
+      box-shadow: 0 8px 40px rgba(0, 229, 255, 0.15);
+    }
+    .card .note {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #5a6a82;
+      line-height: 1.6;
+    }
+    .card .tag {
+      display: inline-block;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 4px 14px;
+      border-radius: 14px;
+      margin-bottom: 10px;
+    }
+    .tag.green { background: rgba(80, 220, 120, 0.15); color: #7fe8a4; }
+    .tag.blue { background: rgba(0, 229, 255, 0.12); color: #7df9ff; }
+  </style>
+</head>
+<body>
+  <h1>👁️ 瞳伴 EyeBuddy</h1>
+  <p class="sub">给视障用户的浏览器眼睛 · 五种功能协同的无障碍插件</p>
+
+  <p class="question">当一张图片没有文字说明，视障用户怎么知道图里是什么？</p>
+
+  <div class="grid">
+    <div class="card">
+      <span class="tag green">镜头 1 · 有描述的图</span>
+      <img src="demo-images/dog.jpg"
+           alt="一只黑色的拉布拉多幼犬趴在木地板上，抬头看着镜头">
+      <p class="note">网页写了 alt → 悬停即读，零成本</p>
+    </div>
+
+    <div class="card">
+      <span class="tag blue">镜头 2 · AI 主打：没有描述的图</span>
+      <img src="demo-images/fjord.jpg"
+           data-demo-desc="这是一张峡湾风光照片：蓝绿色的宽阔水面夹在陡峭的群山之间，近处的岩石悬崖上站着一群游客，天空湛蓝，飘着几朵白云。">
+      <p class="note">网页什么都没写 → 悬停，AI 看图说话</p>
+    </div>
+
+    <div class="card">
+      <span class="tag blue">镜头 2 备用 · 换一张也行</span>
+      <img src="demo-images/canyon.jpg"
+           data-demo-desc="这是一张黄昏时分的红色岩石山地照片，夕阳把陡峭的岩壁染成橙红色，天空云层半明半暗，前景是大块的岩石。">
+      <p class="note">备选演示图（第一张效果不佳时换这张）</p>
+    </div>
+  </div>
+</body>
+</html>

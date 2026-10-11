@@ -20,7 +20,7 @@
 - [项目结构](#项目结构)
 - [技术栈](#技术栈)
 - [权限说明](#权限说明)
-- [配置通义千问 API Key](#配置通义千问-api-key)
+- [配置 Agnes AI API Key](#配置-agnes-ai-api-key)
 - [开发与调试](#开发与调试)
 - [路线图](#路线图)
 - [背景与缘起](#背景与缘起)
@@ -97,7 +97,7 @@ SVG 色彩矩阵滤镜，三种模式一键切换，覆盖最常见色盲类型�
 3. 右上角开启**开发者模式**
 4. 点击**加载已解压**，选择仓库内的 `插件/` 文件夹
 5. 点击浏览器工具栏的瞳伴图标，完成首次引导
-6. 在插件弹窗的**设置**中填入通义千问 API Key（[阿里云百炼平台免费申请](https://dashscope.console.aliyun.com/apiKey)，新用户 100 万 tokens 一次性免费额度，有效期 3 个月）
+6. 在插件弹窗的**设置**中填入 Agnes AI API Key（[Agnes AI 平台免费申请](https://platform.agnes-ai.cn/)，活动页 https://agnes-ai.cn/campaign ，当前 `agnes-3.0-flash` 多模态模型免费额度）
 
 ### 方式二：在线浏览展示页（无需安装）
 
@@ -165,21 +165,23 @@ EyeBuddy/
 | `activeTab` / `tabs` | 获取当前标签页信息、注入内容脚本 |
 | `<all_urls>`（host_permissions） | 在任意网页上提供无障碍能力（朗读 / 准星 / 色盲 / 截图） |
 
-> 插件不收集、不上传任何用户数据。API Key 仅存储在本地 `chrome.storage.local`，仅用于直接调用通义千问 API。
+> 插件不收集、不上传任何用户数据。API Key 仅存储在本地 `chrome.storage.local`，仅用于直接调用 Agnes AI API。
 
 ---
 
-## 配置通义千问 API Key
+## 配置 Agnes AI API Key
 
-AI 页面描述功能需要通义千问 API Key：
+AI 页面描述与图片悬停描述功能需要 Agnes AI API Key：
 
-1. 访问 [阿里云百炼平台](https://dashscope.console.aliyun.com/apiKey)
-2. 登录阿里云账号，点击**创建 API Key**
-3. 复制 Key（形如 `sk-xxxxxxxx`）
-4. 点击 Chrome 工具栏的瞳伴图标 → **设置** → 粘贴到"通义千问 API Key"输入框
+1. 访问 [Agnes AI API 平台](https://platform.agnes-ai.cn/)（免费额度活动页：https://agnes-ai.cn/campaign ）
+2. 注册 / 登录账号，在开发者控制台生成 API Key
+3. 复制 Key
+4. 点击 Chrome 工具栏的瞳伴图标 → **设置** → 粘贴到"Agnes AI API Key"输入框
 5. 保存即可
 
-**费用**：新用户 100 万 tokens 一次性免费额度，有效期 3 个月。日常使用每次描述约消耗 1–2 千 tokens，免费额度可描述约 500–1000 个页面。
+**接口与模型**：插件通过 OpenAI 兼容接口 `https://api.agnes-ai.cn/v1/chat/completions` 调用多模态模型 `agnes-3.0-flash`（截图以 JPEG Data URL 发送，已实测支持 base64 图像输入）。当前该模型在免费活动期内，按量价格为 ¥0；接口地址与模型名集中在 `插件/background.js` 顶部的 `AGNES_API_URL`、`AGNES_MODEL` 两个常量，如需切换其他 OpenAI 兼容服务商（如阿里云百炼、硅基流动、智谱等），修改这两个常量即可。
+
+**故障排查**：调用失败时，页面浮层会直接显示具体原因——401 表示 Key 无效，404 表示模型名或地址错误，429 表示限流或额度用尽，详细日志见扩展卡片的 Service Worker 控制台。
 
 ---
 
