@@ -6,6 +6,7 @@ const DEFAULT_STATE = {
     textReader: false,
     crosshair: false,
     colorBlindMode: "off",
+    danmakuSummary: false,
   },
   apiKey: "",
   demoMode: false,
@@ -181,6 +182,116 @@ async function handleDescribeImage(imageBase64) {
   }
 }
 
+const DANMAKU_API_URL = "https://api.bilibili.com/x/v1/dm/list.so";
+const MAX_DANMAKU_ITEMS = 4000;
+
+function formatDanmakuTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function parseDanmakuXML(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+  const items = [];
+  for (const d of doc.querySelectorAll("d")) {
+    const p = (d.getAttribute("p") || "").split(",");
+    if (p.length < 8) continue;
+    const type = parseInt(p[1]);
+    if (![1, 2, 3].includes(type)) continue;
+    const content = (d.textContent || "").trim();
+    if (!content) continue;
+    items.push({
+      time: parseFloat(p[0]),
+      sendTime: parseInt(p[4]),
+      content,
+    });
+  }
+  return items.sort((a, b) => a.time - b.time);
+}
+
+async function fetchDanmaku(cid) {
+  const response = await fetch(`${DANMAKU_API_URL}?oid=${cid}`, {
+    headers: { Referer: "https://www.bilibili.com" },
+  });
+  if (!response.ok) {
+    throw new Error(`弹幕接口 ${response.status}`);
+  }
+  const xmlText = await response.text();
+  return parseDanmakuXML(xmlText);
+}
+
+async function summarizeDanmaku(items, apiKey) {
+  const lines = items
+    .slice(0, MAX_DANMAKU_ITEMS)
+    .map((it) => `${formatDanmakuTime(it.time)} ${it.content}`)
+    .join("\n");
+
+  const prompt = `以下是B站视频的全部弹幕数据（含时间点与内容）。
+请总结弹幕中观众讨论的核心观点、高频话题和热点评论。
+要求：口语化、适合语音播报、不超过120字。
+按时间顺序提及2-3个关键时间节点。
+
+弹幕数据：
+---
+${lines}
+---`;
+
+  const response = await fetch(AGNES_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: AGNES_MODEL,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await buildApiError(response));
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "无法生成总结";
+}
+
+async function handleDanmakuSummary(cid) {
+  const state = await getState();
+
+  if (!state.apiKey && !state.demoMode) {
+    return { error: "请先在插件设置中配置 API Key" };
+  }
+
+  let items;
+  try {
+    items = await fetchDanmaku(cid);
+  } catch (e) {
+    console.error("瞳伴弹幕获取错误:", e.message);
+    return { error: "弹幕获取失败，可能视频无弹幕或接口限制" };
+  }
+
+  if (!items || items.length === 0) {
+    return { error: "该视频暂无弹幕" };
+  }
+
+  if (state.demoMode) {
+    await new Promise((r) => setTimeout(r, 1000 + Math.random() * 1000));
+    return {
+      summary: `这条视频共抓取到${items.length}条弹幕，讨论非常热烈。开场2分钟大家刷"前排"和"来了"，12分左右集中讨论主角操作细节，结尾处"泪目"和"完结撒花"刷屏。整体情绪以感动和认可为主。`,
+    };
+  }
+
+  try {
+    const summary = await summarizeDanmaku(items, state.apiKey);
+    return { summary };
+  } catch (e) {
+    console.error("瞳伴弹幕总结错误:", e.message);
+    return { error: "弹幕总结失败，请检查 Key 和网络" };
+  }
+}
+
 chrome.commands.onCommand.addListener(async (command) => {
   const state = await getState();
   const tab = await getActiveTab();
@@ -198,6 +309,8 @@ chrome.commands.onCommand.addListener(async (command) => {
       });
     } else if (command === "describe-page") {
       await chrome.tabs.sendMessage(tab.id, { type: "SCAN_NOW" });
+    } else if (command === "danmaku-summary") {
+      await chrome.tabs.sendMessage(tab.id, { type: "DANMAKU_SUMMARY_NOW" });
     } else if (command === "toggle-reader") {
       const newValue = !state.features.textReader;
       state.features.textReader = newValue;
@@ -238,6 +351,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === "DESCRIBE_IMAGE_AI") {
     handleDescribeImage(msg.imageBase64).then(sendResponse);
+    return true;
+  }
+  if (msg.type === "FETCH_DANMAKU") {
+    handleDanmakuSummary(msg.cid).then(sendResponse);
     return true;
   }
 });
